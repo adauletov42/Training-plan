@@ -1,0 +1,15 @@
+{
+  "name": "Мой план тренировок",
+  "short_name": "Тренировки",
+  "description": "Персональная программа тренировок — 20 недель",
+  "start_url": "/Training-plan/",
+  "scope": "/Training-plan/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f4f0",
+  "theme_color": "#534AB7",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
