@@ -272,6 +272,20 @@
 <!-- PROGRESS -->
 <div id="tab-progress-panel" class="tab">
   <div class="card">
+    <div class="card-title"><i class="ti ti-clipboard-check" aria-hidden="true"></i> Ежедневный чекин</div>
+    <div class="log-form">
+      <div class="form-row">
+        <div class="form-group"><label>Дата</label><input type="date" id="ciDate"></div>
+        <div class="form-group" style="min-width:90px;max-width:110px;"><label>Вес (кг)</label><input type="number" id="ciWeight" step="0.1" placeholder="105.0"></div>
+        <div class="form-group" style="min-width:80px;max-width:100px;"><label>Сон (ч)</label><input type="number" id="ciSleep" step="0.5" placeholder="7.5"></div>
+        <div class="form-group" style="min-width:90px;max-width:110px;"><label>Самочувствие (1–10)</label><input type="number" id="ciFeeling" min="1" max="10" placeholder="7"></div>
+      </div>
+      <div class="form-group"><label>Заметка</label><input type="text" id="ciNote" placeholder="Необязательно..."></div>
+      <div><button class="btn btn-primary" onclick="saveCheckin()"><i class="ti ti-device-floppy" aria-hidden="true"></i> Сохранить</button></div>
+    </div>
+    <div id="ciHistory" style="margin-top:1rem;"></div>
+  </div>
+  <div class="card">
     <div class="card-title"><i class="ti ti-weight" aria-hidden="true"></i> Вес тела</div>
     <div class="chart-wrap" style="padding:0.5rem;"><canvas id="weightChart" height="160"></canvas></div>
   </div>
@@ -724,6 +738,51 @@ function renderLogHistory() {
   }).join('');
 }
 
+// ── Daily check-in ─────────────────────────────────────────────────────────
+function getCheckins() { try { return JSON.parse(localStorage.getItem('dailyCheckins')||'[]'); } catch { return []; } }
+function saveCheckin() {
+  const date = document.getElementById('ciDate').value;
+  const weight = parseFloat(document.getElementById('ciWeight').value)||null;
+  const sleep = parseFloat(document.getElementById('ciSleep').value)||null;
+  const feeling = parseInt(document.getElementById('ciFeeling').value)||null;
+  const note = document.getElementById('ciNote').value.trim();
+  if (!date || (!weight && !sleep && !feeling)) { alert('Введите дату и хотя бы одно значение'); return; }
+  const checkins = getCheckins();
+  const existing = checkins.findIndex(c => c.date === date);
+  const entry = { date, weight, sleep, feeling, note };
+  if (existing >= 0) checkins[existing] = entry; else checkins.unshift(entry);
+  checkins.sort((a,b) => b.date.localeCompare(a.date));
+  localStorage.setItem('dailyCheckins', JSON.stringify(checkins));
+  document.getElementById('ciWeight').value = '';
+  document.getElementById('ciSleep').value = '';
+  document.getElementById('ciFeeling').value = '';
+  document.getElementById('ciNote').value = '';
+  renderCheckinHistory();
+  renderProgress();
+  renderDashboard();
+}
+function deleteCheckin(date) {
+  localStorage.setItem('dailyCheckins', JSON.stringify(getCheckins().filter(c => c.date !== date)));
+  renderCheckinHistory(); renderProgress(); renderDashboard();
+}
+function renderCheckinHistory() {
+  const checkins = getCheckins();
+  const el = document.getElementById('ciHistory');
+  if (!checkins.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div style="font-size:12px;font-weight:500;color:var(--text-2);margin-bottom:8px;">${checkins.length} записей</div>` +
+  checkins.slice(0, 10).map(c => `
+    <div class="log-entry">
+      <div class="log-entry-header">
+        <div>
+          <div class="log-entry-date" style="font-size:13px;font-weight:500;">${c.date}</div>
+          <div class="log-entry-date">${[c.weight?c.weight+' кг':null, c.sleep?'сон '+c.sleep+' ч':null, c.feeling?'самочувствие '+c.feeling+'/10':null].filter(Boolean).join(' · ')}</div>
+          ${c.note ? `<div class="log-entry-note">${c.note}</div>` : ''}
+        </div>
+        <button class="btn btn-danger" onclick="deleteCheckin('${c.date}')" style="font-size:12px;padding:4px 8px;"><i class="ti ti-trash" aria-hidden="true"></i></button>
+      </div>
+    </div>`).join('');
+}
+
 // ── Progress ───────────────────────────────────────────────────────────────
 function saveCooper() {
   const week=document.getElementById('cooperWeek').value;
@@ -747,8 +806,18 @@ function saveStrength() {
 }
 function renderProgress() {
   const logs=getLogs();
-  renderLineChart('weightChart',logs.filter(l=>l.bodyWeight).reverse().map(l=>({x:l.date,y:l.bodyWeight})),'Вес (кг)','#534AB7',85,110);
-  renderLineChart('feelingChart',logs.filter(l=>l.feeling).reverse().map(l=>({x:l.date,y:l.feeling})),'Самочувствие','#0F6E56',0,10);
+  const checkins=getCheckins();
+  // merge workout logs + daily checkins for charts, deduplicate by date (checkin wins)
+  const weightMap={};
+  logs.filter(l=>l.bodyWeight).forEach(l=>{ if(!weightMap[l.date]) weightMap[l.date]=l.bodyWeight; });
+  checkins.filter(c=>c.weight).forEach(c=>{ weightMap[c.date]=c.weight; });
+  const weightData=Object.entries(weightMap).sort((a,b)=>a[0].localeCompare(b[0])).map(([x,y])=>({x,y}));
+  const feelingMap={};
+  logs.filter(l=>l.feeling).forEach(l=>{ if(!feelingMap[l.date]) feelingMap[l.date]=l.feeling; });
+  checkins.filter(c=>c.feeling).forEach(c=>{ feelingMap[c.date]=c.feeling; });
+  const feelingData=Object.entries(feelingMap).sort((a,b)=>a[0].localeCompare(b[0])).map(([x,y])=>({x,y}));
+  renderLineChart('weightChart',weightData,'Вес (кг)','#534AB7',85,110);
+  renderLineChart('feelingChart',feelingData,'Самочувствие','#0F6E56',0,10);
   const cooperData=JSON.parse(localStorage.getItem('cooperTests')||'{}');
   const cooperEl=document.getElementById('cooperTests');
   const vo2=d=>((d-504.9)/44.73).toFixed(1);
@@ -824,7 +893,7 @@ function showTab(name) {
   document.getElementById('tab-'+name).classList.add('active');
   if (name==='schedule') renderSchedule();
   if (name==='log') renderLogHistory();
-  if (name==='progress') renderProgress();
+  if (name==='progress') { renderCheckinHistory(); renderProgress(); }
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
@@ -832,7 +901,10 @@ document.addEventListener('DOMContentLoaded', () => {
   displayWeek = getWeek();
   document.getElementById('logType').addEventListener('change', updateSetsSection);
   updateSetsSection();
-  document.getElementById('logDate').value = new Date().toISOString().slice(0,10);
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('logDate').value = today;
+  document.getElementById('ciDate').value = today;
+  renderCheckinHistory();
   renderDashboard();
 });
 </script>
