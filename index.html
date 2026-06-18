@@ -12,6 +12,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -178,6 +179,7 @@
 
   /* Hint bar */
   .hint-bar { font-size: 12px; color: var(--text-3); padding: 6px 10px; background: var(--bg); border-radius: var(--r-md); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .auth-bar { font-size: 12px; color: var(--text-2); padding: 8px 10px; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--r-md); margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
   @media (max-width: 600px) {
     .exercise-table th:nth-child(3), .exercise-table td:nth-child(3) { display: none; }
@@ -200,6 +202,11 @@
   <button onclick="showTab('progress')" id="tab-progress"><i class="ti ti-chart-line" aria-hidden="true"></i> Прогресс</button>
   <button onclick="showTab('nutrition')" id="tab-nutrition"><i class="ti ti-apple" aria-hidden="true"></i> Питание</button>
 </nav>
+
+<div class="auth-bar">
+  <span id="authStatusText"><i class="ti ti-cloud-off" aria-hidden="true"></i> Данные хранятся локально</span>
+  <button class="btn" id="authBarBtn" style="font-size:12px;padding:4px 10px;" onclick="openAuthPanel()">Войти / Синхронизировать</button>
+</div>
 
 <!-- DASHBOARD -->
 <div id="tab-dashboard-panel" class="tab active">
@@ -416,6 +423,35 @@
 
 </div>
 
+<!-- Auth Panel -->
+<div class="workout-panel" id="authPanel" onclick="closeAuthPanelBg(event)">
+  <div class="workout-panel-inner">
+    <div class="panel-handle"></div>
+    <div class="panel-title">Аккаунт</div>
+
+    <div id="authFormView" class="log-form">
+      <div class="form-group"><label>Email</label><input type="email" id="authEmail" placeholder="you@example.com"></div>
+      <div class="form-group"><label>Пароль</label><input type="password" id="authPassword" placeholder="мин. 6 символов"></div>
+      <div id="authError" style="font-size:13px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" onclick="doSignIn()"><i class="ti ti-login" aria-hidden="true"></i> Войти</button>
+        <button class="btn" onclick="doSignUp()"><i class="ti ti-user-plus" aria-hidden="true"></i> Зарегистрироваться</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-3);">При регистрации данные с этого устройства будут загружены в облако. При входе на новом устройстве — данные из облака заменят локальные.</div>
+    </div>
+
+    <div id="authLoggedInView" class="log-form" style="display:none;">
+      <div style="font-size:14px;">Вы вошли как <b id="authUserEmail"></b></div>
+      <div style="font-size:12px;color:var(--text-3);">Данные автоматически синхронизируются между всеми устройствами, где выполнен вход в этот аккаунт.</div>
+      <button class="btn btn-danger" onclick="doSignOut()"><i class="ti ti-logout" aria-hidden="true"></i> Выйти</button>
+    </div>
+
+    <div style="margin-top:1.25rem;">
+      <button class="btn" onclick="closeAuthPanel()">Закрыть</button>
+    </div>
+  </div>
+</div>
+
 <!-- Workout Panel -->
 <div class="workout-panel" id="workoutPanel" onclick="closePanel(event)">
   <div class="workout-panel-inner">
@@ -492,6 +528,163 @@ const WORKOUTS = {
   }
 };
 
+// ── Supabase (cloud sync) ────────────────────────────────────────────────
+const SUPABASE_URL = 'https://ufnityjbeaccwgxtjikl.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_bPBjH4MJ_az3UGTtozPuFg_DY31scCA';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentSession = null;
+
+function openAuthPanel() {
+  document.getElementById('authError').textContent = '';
+  document.getElementById('authPanel').classList.add('open');
+  refreshAuthPanelView();
+}
+function closeAuthPanel() { document.getElementById('authPanel').classList.remove('open'); }
+function closeAuthPanelBg(e) { if (e.target === document.getElementById('authPanel')) closeAuthPanel(); }
+
+function refreshAuthPanelView() {
+  const formView = document.getElementById('authFormView');
+  const loggedView = document.getElementById('authLoggedInView');
+  if (currentSession) {
+    formView.style.display = 'none';
+    loggedView.style.display = 'flex';
+    document.getElementById('authUserEmail').textContent = currentSession.user.email;
+  } else {
+    formView.style.display = 'flex';
+    loggedView.style.display = 'none';
+  }
+}
+
+function updateAuthBar() {
+  const text = document.getElementById('authStatusText');
+  const btn = document.getElementById('authBarBtn');
+  if (currentSession) {
+    text.innerHTML = '<i class="ti ti-cloud-check" aria-hidden="true"></i> ' + currentSession.user.email;
+    btn.textContent = 'Аккаунт';
+  } else {
+    text.innerHTML = '<i class="ti ti-cloud-off" aria-hidden="true"></i> Данные хранятся локально';
+    btn.textContent = 'Войти / Синхронизировать';
+  }
+}
+
+async function doSignUp() {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const err = document.getElementById('authError');
+  err.style.color = 'var(--red)';
+  if (!email || password.length < 6) { err.textContent = 'Введите email и пароль (мин. 6 символов)'; return; }
+  const { error } = await sb.auth.signUp({ email, password });
+  if (error) { err.textContent = error.message; return; }
+  err.style.color = 'var(--green-text)';
+  err.textContent = 'Проверьте почту для подтверждения регистрации, затем войдите.';
+}
+async function doSignIn() {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const err = document.getElementById('authError');
+  err.style.color = 'var(--red)';
+  if (!email || !password) { err.textContent = 'Введите email и пароль'; return; }
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { err.textContent = error.message; return; }
+  document.getElementById('authEmail').value = '';
+  document.getElementById('authPassword').value = '';
+  closeAuthPanel();
+}
+async function doSignOut() {
+  await sb.auth.signOut();
+  closeAuthPanel();
+}
+
+sb.auth.onAuthStateChange((event, session) => {
+  currentSession = session;
+  updateAuthBar();
+  refreshAuthPanelView();
+  if (event === 'SIGNED_IN') {
+    pullAllData().then(renderEverything);
+  }
+});
+
+async function pullAllData() {
+  const [{ data: logs }, { data: checkins }, { data: cooper }, { data: strength }, { data: sched }] = await Promise.all([
+    sb.from('workout_logs').select('*').order('date', { ascending: false }),
+    sb.from('checkins').select('*'),
+    sb.from('cooper_tests').select('*'),
+    sb.from('strength_records').select('*').order('date', { ascending: false }),
+    sb.from('schedule_overrides').select('*'),
+  ]);
+  if (logs) {
+    localStorage.setItem('trainLogs', JSON.stringify(logs.map(l => ({
+      id: Number(l.id), date: l.date, type: l.type, bodyWeight: l.body_weight,
+      sleep: l.sleep, feeling: l.feeling, finisher: l.finisher, notes: l.notes, sets: l.sets || {},
+    }))));
+  }
+  if (checkins) {
+    localStorage.setItem('dailyCheckins', JSON.stringify(
+      checkins.map(c => ({ date: c.date, weight: c.weight, sleep: c.sleep, feeling: c.feeling, note: c.note }))
+        .sort((a, b) => b.date.localeCompare(a.date))
+    ));
+  }
+  if (cooper) {
+    const obj = {}; cooper.forEach(c => obj[c.week] = c.distance);
+    localStorage.setItem('cooperTests', JSON.stringify(obj));
+  }
+  if (strength) {
+    localStorage.setItem('strengthRecords', JSON.stringify(strength.map(s => ({ date: s.date, ex: s.ex, kg: s.kg }))));
+  }
+  if (sched) {
+    sched.forEach(s => localStorage.setItem('sched_w' + s.week, JSON.stringify(s.data)));
+  }
+}
+
+function renderEverything() {
+  displayWeek = getWeek();
+  renderDashboard();
+  renderCheckinHistory();
+  renderProgress();
+  renderLogHistory();
+  if (document.getElementById('tab-schedule-panel').classList.contains('active')) renderSchedule();
+}
+
+async function pushLog(entry) {
+  if (!currentSession) return;
+  await sb.from('workout_logs').upsert({
+    id: entry.id, user_id: currentSession.user.id, date: entry.date, type: entry.type,
+    body_weight: entry.bodyWeight, sleep: entry.sleep, feeling: entry.feeling,
+    finisher: entry.finisher, notes: entry.notes, sets: entry.sets,
+  });
+}
+async function pushDeleteLog(id) {
+  if (!currentSession) return;
+  await sb.from('workout_logs').delete().eq('id', id);
+}
+async function pushCheckin(entry) {
+  if (!currentSession) return;
+  await sb.from('checkins').upsert({
+    user_id: currentSession.user.id, date: entry.date, weight: entry.weight, sleep: entry.sleep, feeling: entry.feeling, note: entry.note,
+  });
+}
+async function pushDeleteCheckin(date) {
+  if (!currentSession) return;
+  await sb.from('checkins').delete().eq('date', date);
+}
+async function pushCooper(week, dist) {
+  if (!currentSession) return;
+  await sb.from('cooper_tests').upsert({ user_id: currentSession.user.id, week: +week, distance: dist });
+}
+async function pushStrength(entry) {
+  if (!currentSession) return;
+  await sb.from('strength_records').insert({ user_id: currentSession.user.id, date: entry.date, ex: entry.ex, kg: entry.kg });
+}
+async function pushSchedule(week, sched) {
+  if (!currentSession) return;
+  await sb.from('schedule_overrides').upsert({ user_id: currentSession.user.id, week, data: sched });
+}
+async function pushDeleteSchedule(week) {
+  if (!currentSession) return;
+  await sb.from('schedule_overrides').delete().eq('week', week);
+}
+
 // ── State ──────────────────────────────────────────────────────────────────
 let displayWeek = 1;
 
@@ -520,11 +713,13 @@ function getWeekSchedule(week) {
 
 function saveWeekSchedule(week, sched) {
   localStorage.setItem(getOverrideKey(week), JSON.stringify(sched));
+  pushSchedule(week, sched);
 }
 
 function resetWeek() {
   if (!confirm('Сбросить расписание этой недели до стандартного?')) return;
   localStorage.removeItem(getOverrideKey(displayWeek));
+  pushDeleteSchedule(displayWeek);
   renderSchedule();
 }
 
@@ -796,6 +991,7 @@ function saveLog() {
   const logs = getLogs();
   logs.unshift(entry);
   localStorage.setItem('trainLogs', JSON.stringify(logs));
+  pushLog(entry);
   document.getElementById('logFinisher').value='';
   document.getElementById('logNotes').value='';
   document.getElementById('logBodyWeight').value='';
@@ -810,6 +1006,7 @@ function getLogs() { try { return JSON.parse(localStorage.getItem('trainLogs')||
 function getLastLog() { return getLogs().find(l=>l.bodyWeight)||null; }
 function deleteLog(id) {
   localStorage.setItem('trainLogs', JSON.stringify(getLogs().filter(l=>l.id!==id)));
+  pushDeleteLog(id);
   renderLogHistory(); renderDashboard();
 }
 function renderLogHistory() {
@@ -850,6 +1047,7 @@ function saveCheckin() {
   if (existing >= 0) checkins[existing] = entry; else checkins.unshift(entry);
   checkins.sort((a,b) => b.date.localeCompare(a.date));
   localStorage.setItem('dailyCheckins', JSON.stringify(checkins));
+  pushCheckin(entry);
   document.getElementById('ciWeight').value = '';
   document.getElementById('ciSleep').value = '';
   document.getElementById('ciFeeling').value = '';
@@ -860,6 +1058,7 @@ function saveCheckin() {
 }
 function deleteCheckin(date) {
   localStorage.setItem('dailyCheckins', JSON.stringify(getCheckins().filter(c => c.date !== date)));
+  pushDeleteCheckin(date);
   renderCheckinHistory(); renderProgress(); renderDashboard();
 }
 function renderCheckinHistory() {
@@ -926,6 +1125,7 @@ function saveCooper() {
   const data=JSON.parse(localStorage.getItem('cooperTests')||'{}');
   data[week]=dist;
   localStorage.setItem('cooperTests',JSON.stringify(data));
+  pushCooper(week,dist);
   document.getElementById('cooperDist').value='';
   renderProgress();
 }
@@ -934,8 +1134,10 @@ function saveStrength() {
   const kg=parseFloat(document.getElementById('strengthKg').value);
   if (!kg) return;
   const data=JSON.parse(localStorage.getItem('strengthRecords')||'[]');
-  data.unshift({date:new Date().toISOString().slice(0,10),ex,kg});
+  const entry={date:new Date().toISOString().slice(0,10),ex,kg};
+  data.unshift(entry);
   localStorage.setItem('strengthRecords',JSON.stringify(data));
+  pushStrength(entry);
   document.getElementById('strengthKg').value='';
   renderProgress();
 }
@@ -1037,7 +1239,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   displayWeek = getWeek();
   document.getElementById('logType').addEventListener('change', updateSetsSection);
   updateSetsSection();
@@ -1046,6 +1248,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('ciDate').value = today;
   renderCheckinHistory();
   renderDashboard();
+
+  const { data: { session } } = await sb.auth.getSession();
+  currentSession = session;
+  updateAuthBar();
+  if (session) {
+    await pullAllData();
+    renderEverything();
+  }
 });
 </script>
 </body>
