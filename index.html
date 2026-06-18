@@ -198,6 +198,7 @@
   <button onclick="showTab('schedule')" id="tab-schedule"><i class="ti ti-calendar-week" aria-hidden="true"></i> Расписание</button>
   <button onclick="showTab('log')" id="tab-log"><i class="ti ti-notebook" aria-hidden="true"></i> Дневник</button>
   <button onclick="showTab('progress')" id="tab-progress"><i class="ti ti-chart-line" aria-hidden="true"></i> Прогресс</button>
+  <button onclick="showTab('nutrition')" id="tab-nutrition"><i class="ti ti-apple" aria-hidden="true"></i> Питание</button>
 </nav>
 
 <!-- DASHBOARD -->
@@ -320,6 +321,84 @@
       </div>
       <div class="form-group" style="min-width:80px;max-width:100px;"><label>Кг</label><input type="number" id="strengthKg" placeholder="60"></div>
       <div style="display:flex;align-items:flex-end;"><button class="btn" onclick="saveStrength()"><i class="ti ti-plus" aria-hidden="true"></i> Добавить</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- NUTRITION -->
+<div id="tab-nutrition-panel" class="tab">
+  <div class="card">
+    <div class="card-title"><i class="ti ti-flame" aria-hidden="true"></i> Калории и БЖУ</div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Тренировочный день</div><div class="metric-value">2700 ккал</div><div class="metric-sub">Пн, Вт, Чт, Пт, Сб</div></div>
+      <div class="metric"><div class="metric-label">День отдыха</div><div class="metric-value">2400 ккал</div><div class="metric-sub">Ср, Вс</div></div>
+      <div class="metric"><div class="metric-label">Дефицит</div><div class="metric-value">~500 ккал</div><div class="metric-sub">относительно TDEE ~3200 ккал</div></div>
+    </div>
+    <table class="exercise-table">
+      <thead><tr><th></th><th>Белок</th><th>Углеводы (трен.)</th><th>Углеводы (отдых)</th><th>Жиры</th></tr></thead>
+      <tbody>
+        <tr><td>Суточная норма</td><td>210 г</td><td>280 г</td><td>180 г</td><td>80 г</td></tr>
+        <tr><td>г/кг веса тела</td><td>2.0</td><td>2.7</td><td>1.7</td><td>0.76</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><i class="ti ti-clock" aria-hidden="true"></i> Тайминг питания (тренировка 12:30)</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;gap:12px;align-items:flex-start;"><span style="min-width:90px;font-size:13px;font-weight:500;color:var(--accent-text);">07:30</span><span style="font-size:13px;color:var(--text-2);">Завтрак — углеводы + белок + жиры</span></div>
+      <div style="display:flex;gap:12px;align-items:flex-start;"><span style="min-width:90px;font-size:13px;font-weight:500;color:var(--accent-text);">11:00–11:30</span><span style="font-size:13px;color:var(--text-2);">Предтренировочный — углеводы + белок, жир минимален</span></div>
+      <div style="display:flex;gap:12px;align-items:flex-start;"><span style="min-width:90px;font-size:13px;font-weight:500;color:var(--accent-text);">12:30–14:00</span><span style="font-size:13px;color:var(--text-2);">Тренировка — вода 500–700 мл</span></div>
+      <div style="display:flex;gap:12px;align-items:flex-start;"><span style="min-width:90px;font-size:13px;font-weight:500;color:var(--accent-text);">14:00–14:30</span><span style="font-size:13px;color:var(--text-2);">Послетренировочный — белок + углеводы (в течение 30 мин)</span></div>
+      <div style="display:flex;gap:12px;align-items:flex-start;"><span style="min-width:90px;font-size:13px;font-weight:500;color:var(--accent-text);">17:30–18:00</span><span style="font-size:13px;color:var(--text-2);">Обед/полдник — белок + углеводы + жиры</span></div>
+      <div style="display:flex;gap:12px;align-items:flex-start;"><span style="min-width:90px;font-size:13px;font-weight:500;color:var(--accent-text);">19:30–20:30</span><span style="font-size:13px;color:var(--text-2);">Ужин — белок + овощи, углеводы снижены</span></div>
+      <div style="display:flex;gap:12px;align-items:flex-start;"><span style="min-width:90px;font-size:13px;font-weight:500;color:var(--accent-text);">21:30–22:00</span><span style="font-size:13px;color:var(--text-2);">Перед сном — творог 200 г (казеиновый белок)</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><i class="ti ti-droplet" aria-hidden="true"></i> Питьевой режим</div>
+    <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+      <div style="display:flex;align-items:center;gap:10px;"><div style="width:12px;height:12px;border-radius:2px;background:var(--accent);flex-shrink:0;"></div><span style="min-width:140px;color:var(--text-2);">Тренировочные дни</span><span style="font-weight:500;">3.0–3.5 л</span></div>
+      <div style="display:flex;align-items:center;gap:10px;"><div style="width:12px;height:12px;border-radius:2px;background:#085041;flex-shrink:0;"></div><span style="min-width:140px;color:var(--text-2);">Дни БЖЖ</span><span style="font-weight:500;">3.5 л</span><span style="color:var(--text-3);">потеря пота ~0.5–1 л за 90 мин</span></div>
+      <div style="display:flex;align-items:center;gap:10px;"><div style="width:12px;height:12px;border-radius:2px;background:var(--text-3);flex-shrink:0;"></div><span style="min-width:140px;color:var(--text-2);">Дни отдыха</span><span style="font-weight:500;">2.5 л</span></div>
+    </div>
+    <div style="font-size:12px;color:var(--text-3);margin-top:10px;">Во время тренировки — 500–700 мл воды. В жаркую погоду или при обильном потоотделении добавляйте электролиты (натрий, калий, магний).</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><i class="ti ti-toggle-left" aria-hidden="true"></i> Пример меню</div>
+    <div class="hint-bar"><i class="ti ti-info-circle" aria-hidden="true"></i> Тренировочный день (~2700 ккал)</div>
+    <table class="exercise-table">
+      <thead><tr><th>Приём</th><th>Состав</th><th>Ккал</th></tr></thead>
+      <tbody>
+        <tr><td>Завтрак 07:30</td><td>Овсянка 80 г + молоко 200 мл, яйца 3 шт, банан + мёд 1 ч.л.</td><td>~660</td></tr>
+        <tr><td>Предтренировочный 11:00</td><td>Рис варёный 130 г, куриная грудка 150 г, огурец, соевый соус</td><td>~420</td></tr>
+        <tr><td>После тренировки 14:15</td><td>Творог 5% 200 г, гречка варёная 160 г, помидор, зелень</td><td>~520</td></tr>
+        <tr><td>Обед 17:30</td><td>Говядина 200 г, картофель запечённый 250 г, овощной салат + олив. масло</td><td>~680</td></tr>
+        <tr><td>Ужин 20:30</td><td>Лосось 200 г, брокколи 250 г, лимонный сок + олив. масло</td><td>~500</td></tr>
+        <tr><td>Перед сном 22:00</td><td>Творог 0–2% 200 г, корица</td><td>~220</td></tr>
+      </tbody>
+    </table>
+    <div class="hint-bar" style="margin-top:1rem;"><i class="ti ti-info-circle" aria-hidden="true"></i> День отдыха (~2400 ккал)</div>
+    <table class="exercise-table">
+      <thead><tr><th>Приём</th><th>Состав</th><th>Ккал</th></tr></thead>
+      <tbody>
+        <tr><td>Завтрак 08:00</td><td>Омлет 4 яйца + молоко 50 мл + шпинат, авокадо ½, цельнозерн. тост</td><td>~580</td></tr>
+        <tr><td>Обед 13:00</td><td>Говядина 220 г, греческий салат (помидор, огурец, фета 50 г, маслины)</td><td>~680</td></tr>
+        <tr><td>Перекус 16:30</td><td>Творог 5% 200 г + ягоды 100 г</td><td>~280</td></tr>
+        <tr><td>Ужин 19:30</td><td>Лосось 220 г, стручковая фасоль 250 г + чеснок + олив. масло</td><td>~620</td></tr>
+        <tr><td>Перед сном 21:30</td><td>Творог 0% 200 г + грецкие орехи 15 г</td><td>~240</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><i class="ti ti-shopping-cart" aria-hidden="true"></i> Закупка на неделю</div>
+    <div style="font-size:13px;color:var(--text-2);line-height:1.7;">
+      <b>Белок:</b> куриная грудка 1.5 кг, говядина 700 г, индейка 500 г, лосось 600 г, тунец консервированный 4 банки, яйца 20 шт, творог 0–5% 1.5 кг, греческий йогурт 500 г<br><br>
+      <b>Углеводы:</b> гречка 500 г, рис 500 г, овсянка 400 г, картофель 1 кг, бананы 7 шт, цельнозерновой хлеб 1 уп., рисовые хлебцы 1 уп.<br><br>
+      <b>Жиры и овощи:</b> авокадо 3 шт, оливковое масло, грецкие орехи 100 г, арахисовая паста, брокколи 500 г, помидоры/огурцы/перец, стручковая фасоль 400 г, ягоды 300 г
     </div>
   </div>
 </div>
