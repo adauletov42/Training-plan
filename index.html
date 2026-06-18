@@ -313,6 +313,17 @@
     </div>
   </div>
   <div class="card">
+    <div class="card-title"><i class="ti ti-database-export" aria-hidden="true"></i> Экспорт / импорт данных</div>
+    <div style="font-size:13px;color:var(--text-2);margin-bottom:12px;">
+      Все данные хранятся только в этом браузере. Чтобы перенести их на другое устройство — скачайте файл здесь и загрузите его там.
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn" onclick="exportData()"><i class="ti ti-download" aria-hidden="true"></i> Скачать данные</button>
+      <button class="btn" onclick="document.getElementById('importFile').click()"><i class="ti ti-upload" aria-hidden="true"></i> Загрузить данные</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none;" onchange="importData(event)">
+    </div>
+  </div>
+  <div class="card">
     <div class="card-title"><i class="ti ti-barbell" aria-hidden="true"></i> Силовые показатели</div>
     <div id="strengthRecords"></div>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
@@ -867,6 +878,44 @@ function renderCheckinHistory() {
         <button class="btn btn-danger" onclick="deleteCheckin('${c.date}')" style="font-size:12px;padding:4px 8px;"><i class="ti ti-trash" aria-hidden="true"></i></button>
       </div>
     </div>`).join('');
+}
+
+// ── Export / Import ────────────────────────────────────────────────────────
+function exportData() {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    data[key] = localStorage.getItem(key);
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'training-plan-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!confirm('Загрузить данные из файла? Текущие данные в этом браузере будут заменены.')) return;
+      Object.entries(data).forEach(([key, value]) => localStorage.setItem(key, value));
+      alert('Данные загружены!');
+      renderDashboard();
+      renderCheckinHistory();
+      renderProgress();
+      renderLogHistory();
+    } catch {
+      alert('Не удалось прочитать файл — проверьте, что это корректный экспорт.');
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file);
 }
 
 // ── Progress ───────────────────────────────────────────────────────────────
