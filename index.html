@@ -602,18 +602,74 @@ sb.auth.onAuthStateChange((event, session) => {
   updateAuthBar();
   refreshAuthPanelView();
   if (event === 'SIGNED_IN') {
-    pullAllData().then(renderEverything);
+    syncOnLogin();
   }
 });
 
+async function syncOnLogin() {
+  await pushAllLocalData();
+  await pullAllData();
+  renderEverything();
+}
+
+async function pushAllLocalData() {
+  if (!currentSession) return;
+  try {
+    const logs = getLogs();
+    if (logs.length) {
+      const { error } = await sb.from('workout_logs').upsert(logs.map(l => ({
+        id: l.id, user_id: currentSession.user.id, date: l.date, type: l.type,
+        body_weight: l.bodyWeight, sleep: l.sleep, feeling: l.feeling,
+        finisher: l.finisher, notes: l.notes, sets: l.sets,
+      })));
+      if (error) console.error('Sync upload (logs) failed:', error);
+    }
+    const checkins = getCheckins();
+    if (checkins.length) {
+      const { error } = await sb.from('checkins').upsert(checkins.map(c => ({
+        user_id: currentSession.user.id, date: c.date, weight: c.weight, sleep: c.sleep, feeling: c.feeling, note: c.note,
+      })));
+      if (error) console.error('Sync upload (checkins) failed:', error);
+    }
+    const cooper = JSON.parse(localStorage.getItem('cooperTests') || '{}');
+    const cooperRows = Object.entries(cooper).map(([week, distance]) => ({ user_id: currentSession.user.id, week: +week, distance }));
+    if (cooperRows.length) {
+      const { error } = await sb.from('cooper_tests').upsert(cooperRows);
+      if (error) console.error('Sync upload (cooper) failed:', error);
+    }
+    const strength = JSON.parse(localStorage.getItem('strengthRecords') || '[]');
+    if (strength.length) {
+      const { data: existing } = await sb.from('strength_records').select('date,ex,kg');
+      const existingSet = new Set((existing || []).map(s => `${s.date}|${s.ex}|${s.kg}`));
+      const toInsert = strength.filter(s => !existingSet.has(`${s.date}|${s.ex}|${s.kg}`));
+      if (toInsert.length) {
+        const { error } = await sb.from('strength_records').insert(toInsert.map(s => ({
+          user_id: currentSession.user.id, date: s.date, ex: s.ex, kg: s.kg,
+        })));
+        if (error) console.error('Sync upload (strength) failed:', error);
+      }
+    }
+    for (let w = 1; w <= 20; w++) {
+      const raw = localStorage.getItem('sched_w' + w);
+      if (raw) {
+        const { error } = await sb.from('schedule_overrides').upsert({ user_id: currentSession.user.id, week: w, data: JSON.parse(raw) });
+        if (error) console.error('Sync upload (schedule) failed:', error);
+      }
+    }
+  } catch (e) {
+    console.error('Sync upload failed:', e);
+  }
+}
+
 async function pullAllData() {
-  const [{ data: logs }, { data: checkins }, { data: cooper }, { data: strength }, { data: sched }] = await Promise.all([
+  const [{ data: logs, error: e1 }, { data: checkins, error: e2 }, { data: cooper, error: e3 }, { data: strength, error: e4 }, { data: sched, error: e5 }] = await Promise.all([
     sb.from('workout_logs').select('*').order('date', { ascending: false }),
     sb.from('checkins').select('*'),
     sb.from('cooper_tests').select('*'),
     sb.from('strength_records').select('*').order('date', { ascending: false }),
     sb.from('schedule_overrides').select('*'),
   ]);
+  [e1,e2,e3,e4,e5].forEach(e => { if (e) console.error('Sync download failed:', e); });
   if (logs) {
     localStorage.setItem('trainLogs', JSON.stringify(logs.map(l => ({
       id: Number(l.id), date: l.date, type: l.type, bodyWeight: l.body_weight,
@@ -1294,8 +1350,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   currentSession = session;
   updateAuthBar();
   if (session) {
-    await pullAllData();
-    renderEverything();
+    await syncOnLogin();
   }
 });
 </script>
