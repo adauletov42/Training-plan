@@ -98,6 +98,8 @@
   .badge-rest     { background: var(--bg); color: var(--text-3); }
   .badge-recovery { background: var(--green-bg); color: var(--green-text); }
   .badge-skip     { background: var(--red-bg); color: var(--red-text); }
+  .day-done-badge { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: var(--r-md); white-space: nowrap; background: var(--green-bg); color: var(--green-text); display: inline-flex; align-items: center; gap: 4px; }
+  .day-row.done { border-color: var(--green-text, #2e7d32); }
 
   .day-actions { display: flex; gap: 4px; align-items: center; }
   .icon-btn {
@@ -438,13 +440,16 @@
         <button class="btn btn-primary" onclick="doSignIn()"><i class="ti ti-login" aria-hidden="true"></i> Войти</button>
         <button class="btn" onclick="doSignUp()"><i class="ti ti-user-plus" aria-hidden="true"></i> Зарегистрироваться</button>
       </div>
-      <div style="font-size:12px;color:var(--text-3);">При регистрации данные с этого устройства будут загружены в облако. При входе на новом устройстве — данные из облака заменят локальные.</div>
+      <div style="font-size:12px;color:var(--text-3);">При регистрации и при входе данные этого устройства будут загружены в облако и объединены с данными из других устройств.</div>
     </div>
 
     <div id="authLoggedInView" class="log-form" style="display:none;">
       <div style="font-size:14px;">Вы вошли как <b id="authUserEmail"></b></div>
       <div style="font-size:12px;color:var(--text-3);">Данные автоматически синхронизируются между всеми устройствами, где выполнен вход в этот аккаунт.</div>
-      <button class="btn btn-danger" onclick="doSignOut()"><i class="ti ti-logout" aria-hidden="true"></i> Выйти</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="manualSync()"><i class="ti ti-refresh" aria-hidden="true"></i> Синхронизировать сейчас</button>
+        <button class="btn btn-danger" onclick="doSignOut()"><i class="ti ti-logout" aria-hidden="true"></i> Выйти</button>
+      </div>
     </div>
 
     <div style="margin-top:1.25rem;">
@@ -612,6 +617,26 @@ async function syncOnLogin() {
   renderEverything();
 }
 
+async function manualSync() {
+  const btn = document.querySelector('#authLoggedInView .btn:not(.btn-danger)');
+  if (btn) btn.disabled = true;
+  try {
+    await syncOnLogin();
+    alert('Синхронизация завершена');
+  } catch (e) {
+    console.error('Manual sync failed:', e);
+    alert('Ошибка синхронизации, см. консоль');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && currentSession) {
+    syncOnLogin();
+  }
+});
+
 async function pushAllLocalData() {
   if (!currentSession) return;
   try {
@@ -749,6 +774,22 @@ function getWeek() {
   const diff = Math.floor((new Date() - START_DATE) / (7*24*3600*1000)) + 1;
   return Math.max(1, Math.min(20, diff));
 }
+function mondayOfWeek1() {
+  const offsetFromMonday = (START_DATE.getDay() + 6) % 7;
+  const monday = new Date(START_DATE);
+  monday.setDate(monday.getDate() - offsetFromMonday);
+  return monday;
+}
+function getDateForDay(week, dayOfWeek) {
+  const monday = mondayOfWeek1();
+  const offset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const d = new Date(monday);
+  d.setDate(d.getDate() + (week - 1) * 7 + offset);
+  return d.toISOString().slice(0, 10);
+}
+function isDayLogged(dateStr) {
+  return getLogs().some(l => l.date === dateStr);
+}
 function getPhase(w) { return w<=6?1:w<=14?2:3; }
 function getPhaseDesc(w) {
   const p=getPhase(w);
@@ -847,6 +888,8 @@ function renderSchedule() {
   grid.innerHTML = sched.map((d, idx) => {
     const isToday = d.day === today && displayWeek === getWeek();
     const skipped = d.skipped;
+    const dayDate = getDateForDay(displayWeek, d.day);
+    const done = !skipped && isDayLogged(dayDate);
     const meta = TYPE_META[d.type] || { badge:'rest', dur:'—', focus:'' };
     const badgeCls = skipped ? 'badge-skip' : 'badge-' + (d.badge || meta.badge);
     const badgeLabel = skipped ? 'Пропуск' : d.type;
@@ -855,7 +898,7 @@ function renderSchedule() {
       `<option value="${t}" ${t===d.type?'selected':''}>${t}</option>`
     ).join('');
 
-    return `<div class="day-row${isToday?' today':''}${skipped?' skipped':''}"
+    return `<div class="day-row${isToday?' today':''}${skipped?' skipped':''}${done?' done':''}"
       draggable="true"
       ondragstart="onDragStart(event,${idx})"
       ondragend="onDragEnd(event)"
@@ -868,7 +911,7 @@ function renderSchedule() {
         <div class="day-name-row">
           <span class="day-name">${isToday?'▶ ':''}${d.name}</span>
           <span class="day-badge ${badgeCls}">${badgeLabel}</span>
-          ${skipped?'':''}
+          ${done?'<span class="day-done-badge"><i class="ti ti-check" aria-hidden="true"></i> Выполнено</span>':''}
         </div>
         <div class="day-focus">${d.focus || meta.focus} · ${d.dur || meta.dur}</div>
       </div>
@@ -929,10 +972,13 @@ function renderDashboard() {
       </div>
       <div style="font-size:14px;color:var(--text-3);">Эта тренировка отмечена как пропущенная</div>`;
     } else {
+      const todayDate = new Date().toISOString().slice(0,10);
+      const todayDone = isDayLogged(todayDate);
       todayEl.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
           <span class="day-badge badge-${badge}">${dayInfo.type}</span>
           <span style="font-size:13px;color:var(--text-2);">${dayInfo.dur||meta.dur} · 12:30–14:00</span>
+          ${todayDone?'<span class="day-done-badge"><i class="ti ti-check" aria-hidden="true"></i> Выполнено</span>':''}
         </div>
         <div style="font-size:14px;margin-bottom:12px;">${dayInfo.focus||meta.focus}</div>
         <button class="btn" onclick="openWorkoutPanel('${dayInfo.type}','${dayInfo.name}')">
