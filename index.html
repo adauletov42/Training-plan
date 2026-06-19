@@ -450,6 +450,7 @@
         <button class="btn" onclick="manualSync()"><i class="ti ti-refresh" aria-hidden="true"></i> Синхронизировать сейчас</button>
         <button class="btn btn-danger" onclick="doSignOut()"><i class="ti ti-logout" aria-hidden="true"></i> Выйти</button>
       </div>
+      <div id="syncStatusMsg" style="font-size:12px;color:var(--text-3);white-space:pre-line;"></div>
     </div>
 
     <div style="margin-top:1.25rem;">
@@ -612,20 +613,28 @@ sb.auth.onAuthStateChange((event, session) => {
 });
 
 async function syncOnLogin() {
-  await pushAllLocalData();
-  await pullAllData();
+  const pushErrors = await pushAllLocalData();
+  const { logsCount, errors: pullErrors } = await pullAllData();
   renderEverything();
+  return { logsCount, errors: [...pushErrors, ...pullErrors] };
 }
 
 async function manualSync() {
   const btn = document.querySelector('#authLoggedInView .btn:not(.btn-danger)');
+  const statusEl = document.getElementById('syncStatusMsg');
   if (btn) btn.disabled = true;
+  if (statusEl) statusEl.textContent = 'Синхронизация...';
   try {
-    await syncOnLogin();
-    alert('Синхронизация завершена');
+    const { logsCount, errors } = await syncOnLogin();
+    const time = new Date().toLocaleTimeString();
+    if (statusEl) {
+      statusEl.textContent = errors.length
+        ? `[${time}] Ошибка: ${errors.join('; ')}`
+        : `[${time}] Готово. Тренировок в облаке: ${logsCount}`;
+    }
   } catch (e) {
     console.error('Manual sync failed:', e);
-    alert('Ошибка синхронизации, см. консоль');
+    if (statusEl) statusEl.textContent = 'Ошибка синхронизации: ' + (e.message || e);
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -638,7 +647,8 @@ document.addEventListener('visibilitychange', () => {
 });
 
 async function pushAllLocalData() {
-  if (!currentSession) return;
+  const errors = [];
+  if (!currentSession) return errors;
   try {
     const logs = getLogs();
     if (logs.length) {
@@ -647,43 +657,46 @@ async function pushAllLocalData() {
         body_weight: l.bodyWeight, sleep: l.sleep, feeling: l.feeling,
         finisher: l.finisher, notes: l.notes, sets: l.sets,
       })));
-      if (error) console.error('Sync upload (logs) failed:', error);
+      if (error) { console.error('Sync upload (logs) failed:', error); errors.push('загрузка тренировок: ' + error.message); }
     }
     const checkins = getCheckins();
     if (checkins.length) {
       const { error } = await sb.from('checkins').upsert(checkins.map(c => ({
         user_id: currentSession.user.id, date: c.date, weight: c.weight, sleep: c.sleep, feeling: c.feeling, note: c.note,
       })));
-      if (error) console.error('Sync upload (checkins) failed:', error);
+      if (error) { console.error('Sync upload (checkins) failed:', error); errors.push('загрузка чек-инов: ' + error.message); }
     }
     const cooper = JSON.parse(localStorage.getItem('cooperTests') || '{}');
     const cooperRows = Object.entries(cooper).map(([week, distance]) => ({ user_id: currentSession.user.id, week: +week, distance }));
     if (cooperRows.length) {
       const { error } = await sb.from('cooper_tests').upsert(cooperRows);
-      if (error) console.error('Sync upload (cooper) failed:', error);
+      if (error) { console.error('Sync upload (cooper) failed:', error); errors.push('загрузка тестов Купера: ' + error.message); }
     }
     const strength = JSON.parse(localStorage.getItem('strengthRecords') || '[]');
     if (strength.length) {
-      const { data: existing } = await sb.from('strength_records').select('date,ex,kg');
+      const { data: existing, error: selError } = await sb.from('strength_records').select('date,ex,kg');
+      if (selError) { console.error('Sync upload (strength select) failed:', selError); errors.push('чтение силовых: ' + selError.message); }
       const existingSet = new Set((existing || []).map(s => `${s.date}|${s.ex}|${s.kg}`));
       const toInsert = strength.filter(s => !existingSet.has(`${s.date}|${s.ex}|${s.kg}`));
       if (toInsert.length) {
         const { error } = await sb.from('strength_records').insert(toInsert.map(s => ({
           user_id: currentSession.user.id, date: s.date, ex: s.ex, kg: s.kg,
         })));
-        if (error) console.error('Sync upload (strength) failed:', error);
+        if (error) { console.error('Sync upload (strength) failed:', error); errors.push('загрузка силовых: ' + error.message); }
       }
     }
     for (let w = 1; w <= 20; w++) {
       const raw = localStorage.getItem('sched_w' + w);
       if (raw) {
         const { error } = await sb.from('schedule_overrides').upsert({ user_id: currentSession.user.id, week: w, data: JSON.parse(raw) });
-        if (error) console.error('Sync upload (schedule) failed:', error);
+        if (error) { console.error('Sync upload (schedule) failed:', error); errors.push('загрузка расписания: ' + error.message); }
       }
     }
   } catch (e) {
     console.error('Sync upload failed:', e);
+    errors.push('загрузка: ' + (e.message || e));
   }
+  return errors;
 }
 
 async function pullAllData() {
@@ -694,7 +707,9 @@ async function pullAllData() {
     sb.from('strength_records').select('*').order('date', { ascending: false }),
     sb.from('schedule_overrides').select('*'),
   ]);
-  [e1,e2,e3,e4,e5].forEach(e => { if (e) console.error('Sync download failed:', e); });
+  const labels = ['тренировки', 'чек-ины', 'тесты Купера', 'силовые', 'расписание'];
+  const errors = [];
+  [e1,e2,e3,e4,e5].forEach((e, i) => { if (e) { console.error('Sync download failed:', e); errors.push('скачивание (' + labels[i] + '): ' + e.message); } });
   if (logs) {
     localStorage.setItem('trainLogs', JSON.stringify(logs.map(l => ({
       id: Number(l.id), date: l.date, type: l.type, bodyWeight: l.body_weight,
@@ -717,6 +732,7 @@ async function pullAllData() {
   if (sched) {
     sched.forEach(s => localStorage.setItem('sched_w' + s.week, JSON.stringify(s.data)));
   }
+  return { logsCount: logs ? logs.length : 0, errors };
 }
 
 function renderEverything() {
