@@ -786,15 +786,15 @@ async function pushDeleteSchedule(week) {
 // ── State ──────────────────────────────────────────────────────────────────
 let displayWeek = 1;
 
-function getWeek() {
-  const diff = Math.floor((new Date() - START_DATE) / (7*24*3600*1000)) + 1;
-  return Math.max(1, Math.min(20, diff));
-}
 function mondayOfWeek1() {
   const offsetFromMonday = (START_DATE.getDay() + 6) % 7;
   const monday = new Date(START_DATE);
   monday.setDate(monday.getDate() - offsetFromMonday);
   return monday;
+}
+function getWeek() {
+  const diff = Math.floor((new Date() - mondayOfWeek1()) / (7*24*3600*1000)) + 1;
+  return Math.max(1, Math.min(20, diff));
 }
 function getDateForDay(week, dayOfWeek) {
   const monday = mondayOfWeek1();
