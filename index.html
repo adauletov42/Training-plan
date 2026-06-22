@@ -1387,7 +1387,7 @@ function showTab(name) {
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name+'-panel').classList.add('active');
   document.getElementById('tab-'+name).classList.add('active');
-  if (name==='schedule') renderSchedule();
+  if (name==='schedule') { displayWeek = getWeek(); renderSchedule(); }
   if (name==='log') renderLogHistory();
   if (name==='progress') { renderCheckinHistory(); renderProgress(); }
 }
