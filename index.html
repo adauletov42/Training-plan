@@ -818,6 +818,7 @@ function getPhaseDesc(w) {
 function getOverrideKey(week) { return 'sched_w' + week; }
 
 function getWeekSchedule(week) {
+  if (week > 20) return getCatchupWeekSchedule(week);
   try {
     const saved = JSON.parse(localStorage.getItem(getOverrideKey(week)));
     if (saved && saved.length === 7) return saved;
@@ -889,6 +890,36 @@ function changeType(idx, newType) {
 // ── Toggle skip ────────────────────────────────────────────────────────────
 const REST_TYPES = ['Отдых', 'Восстановление'];
 
+function getCatchupQueue() {
+  try { return JSON.parse(localStorage.getItem('catchupQueue') || '[]'); } catch { return []; }
+}
+function saveCatchupQueue(q) { localStorage.setItem('catchupQueue', JSON.stringify(q)); }
+
+function getMaxWeek() {
+  const q = getCatchupQueue();
+  if (!q.length) return 20;
+  // Each catch-up week fits the same number of real training slots as the default week
+  const trainingSlotsPerWeek = DEFAULT_SCHEDULE.filter(d => !REST_TYPES.includes(d.type)).length;
+  return 20 + Math.ceil(q.length / trainingSlotsPerWeek);
+}
+
+function getCatchupWeekSchedule(week) {
+  // Build a synthetic week for week > 20 from the catch-up queue
+  const q = getCatchupQueue();
+  const trainingSlotsPerWeek = DEFAULT_SCHEDULE.filter(d => !REST_TYPES.includes(d.type)).length;
+  const offset = (week - 21) * trainingSlotsPerWeek;
+  const slice = q.slice(offset, offset + trainingSlotsPerWeek);
+  let qIdx = 0;
+  return DEFAULT_SCHEDULE.map(d => {
+    if (!REST_TYPES.includes(d.type) && qIdx < slice.length) {
+      const item = slice[qIdx++];
+      const meta = TYPE_META[item.type] || {};
+      return { ...d, type: item.type, badge: meta.badge || 'strength', focus: meta.focus || '', dur: meta.dur || '', rescheduled: true };
+    }
+    return { ...d };
+  });
+}
+
 function toggleSkip(idx) {
   const sched = getWeekSchedule(displayWeek);
   const wasSkipped = sched[idx].skipped;
@@ -896,27 +927,17 @@ function toggleSkip(idx) {
   sched[idx].skipped = !wasSkipped;
   saveWeekSchedule(displayWeek, sched);
 
-  // When skipping a real workout, reschedule it to the next rest/recovery slot
   if (!wasSkipped && !REST_TYPES.includes(workoutType)) {
-    let rescheduled = false;
-    for (let w = displayWeek; w <= 20 && !rescheduled; w++) {
-      const ws = getWeekSchedule(w);
-      const startIdx = (w === displayWeek) ? idx + 1 : 0;
-      for (let i = startIdx; i < ws.length; i++) {
-        if (REST_TYPES.includes(ws[i].type) && !ws[i].skipped) {
-          const meta = TYPE_META[workoutType] || {};
-          ws[i].type = workoutType;
-          ws[i].badge = meta.badge || 'strength';
-          ws[i].focus = meta.focus || '';
-          ws[i].dur = meta.dur || '';
-          ws[i].rescheduled = true;
-          saveWeekSchedule(w, ws);
-          rescheduled = true;
-          showRescheduleNotice(workoutType, w === displayWeek ? `эта неделя, ${ws[i].name}` : `неделя ${w}, ${ws[i].name}`);
-          break;
-        }
-      }
-    }
+    // Add to catch-up queue — extra weeks beyond week 20
+    const q = getCatchupQueue();
+    q.push({ type: workoutType });
+    saveCatchupQueue(q);
+    showRescheduleNotice(workoutType, `дополнительная неделя ${getMaxWeek()}`);
+  } else if (wasSkipped && !REST_TYPES.includes(workoutType)) {
+    // Un-skipping: remove last matching entry from catch-up queue
+    const q = getCatchupQueue();
+    const lastIdx = q.map(e => e.type).lastIndexOf(workoutType);
+    if (lastIdx !== -1) { q.splice(lastIdx, 1); saveCatchupQueue(q); }
   }
   renderSchedule();
 }
@@ -937,7 +958,10 @@ function showRescheduleNotice(type, when) {
 
 // ── Render schedule ────────────────────────────────────────────────────────
 function renderSchedule() {
-  document.getElementById('weekNavLabel').textContent = 'Неделя ' + displayWeek;
+  const isCatchup = displayWeek > 20;
+  document.getElementById('weekNavLabel').textContent = isCatchup
+    ? `Доп. неделя ${displayWeek - 20} (перенесённые)`
+    : 'Неделя ' + displayWeek;
   const today = new Date().getDay();
   const sched = getWeekSchedule(displayWeek);
   const grid = document.getElementById('weekGrid');
@@ -995,7 +1019,7 @@ function renderSchedule() {
 }
 
 function changeWeek(dir) {
-  displayWeek = Math.max(1, Math.min(20, displayWeek + dir));
+  displayWeek = Math.max(1, Math.min(getMaxWeek(), displayWeek + dir));
   renderSchedule();
 }
 
