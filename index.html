@@ -688,7 +688,7 @@ async function pushAllLocalData() {
         if (error) { console.error('Sync upload (strength) failed:', error); errors.push('загрузка силовых: ' + error.message); }
       }
     }
-    for (let w = 1; w <= 20; w++) {
+    for (let w = 1; w <= getMaxWeek(); w++) {
       const raw = localStorage.getItem('sched_w' + w);
       if (raw) {
         const { error } = await sb.from('schedule_overrides').upsert({ user_id: currentSession.user.id, week: w, data: JSON.parse(raw) });
@@ -821,12 +821,11 @@ function getPhaseDesc(w) {
 function getOverrideKey(week) { return 'sched_w' + week; }
 
 function getWeekSchedule(week) {
-  if (week > 20) return getCatchupWeekSchedule(week);
   try {
     const saved = JSON.parse(localStorage.getItem(getOverrideKey(week)));
     if (saved && saved.length === 7) return saved;
   } catch {}
-  return DEFAULT_SCHEDULE.map(d => ({ ...d }));
+  return week > 20 ? getCatchupWeekSchedule(week) : DEFAULT_SCHEDULE.map(d => ({ ...d }));
 }
 
 function saveWeekSchedule(week, sched) {
