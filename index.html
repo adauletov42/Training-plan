@@ -186,8 +186,9 @@
   .hint-bar { font-size: 12px; color: var(--text-3); padding: 6px 10px; background: var(--bg); border-radius: var(--r-md); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
   .auth-bar { font-size: 12px; color: var(--text-2); padding: 8px 10px; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--r-md); margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
+  .exercise-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .exercise-table-wrap .exercise-table { min-width: 480px; }
   @media (max-width: 600px) {
-    .exercise-table th:nth-child(3), .exercise-table td:nth-child(3) { display: none; }
     .day-focus { display: none; }
   }
 </style>
@@ -1155,14 +1156,14 @@ function openWorkoutPanel(type, dayName) {
     html += `<div style="background:var(--teal-bg);border-radius:var(--r-md);padding:.75rem 1rem;margin-bottom:1rem;">
       <div style="font-size:12px;font-weight:500;color:var(--teal-text);margin-bottom:3px;">Разминка (10 мин)</div>
       <div style="font-size:13px;color:var(--teal-text);">${w.warmup}</div></div>
-    <table class="exercise-table"><thead><tr>
+    <div class="exercise-table-wrap"><table class="exercise-table"><thead><tr>
       <th>Упражнение</th><th>Подходы × Повт.</th><th>Нагрузка по неделям</th><th>Отдых</th>
     </tr></thead><tbody>`;
     w.exercises.forEach(ex => {
-      html += `<tr><td><div class="exercise-name">${ex.name}</div></td><td>${ex.sets} × ${ex.reps}</td>
+      html += `<tr><td><div class="exercise-name">${ex.name}</div></td><td style="white-space:nowrap;">${ex.sets} × ${ex.reps}</td>
         <td><div class="exercise-note">${ex.notes}</div></td><td style="white-space:nowrap;">${ex.rest}</td></tr>`;
     });
-    html += `</tbody></table>
+    html += `</tbody></table></div>
     <div class="finisher-box">
       <div class="finisher-box-title"><i class="ti ti-flame" aria-hidden="true"></i> Метаболический финишер VO₂max (10 мин)</div>
       <div class="finisher-box-body">${w.finisher.replace(/\n/g,'<br>')}</div>
