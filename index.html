@@ -147,11 +147,14 @@
   .sets-grid .header { font-size: 11px; font-weight: 500; color: var(--text-3); }
   .sets-grid input { padding: 6px 8px; font-size: 13px; text-align: center; }
   .sets-grid .ex-name { font-weight: 500; font-size: 13px; padding: 6px 0; align-self: center; }
+  .sets-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .sets-scroll .sets-grid { min-width: 420px; }
   .log-entry { border: 0.5px solid var(--border); border-radius: var(--r-md); padding: 10px 14px; margin-bottom: 8px; }
-  .log-entry-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .log-entry-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; gap: 8px; }
+  .log-entry-header > div:first-child { min-width: 0; flex: 1; }
   .log-entry-title { font-weight: 500; font-size: 14px; }
-  .log-entry-date { font-size: 12px; color: var(--text-3); }
-  .log-entry-sets { font-size: 12px; color: var(--text-2); line-height: 1.8; }
+  .log-entry-date { font-size: 12px; color: var(--text-3); word-break: break-word; }
+  .log-entry-sets { font-size: 12px; color: var(--text-2); line-height: 1.8; word-break: break-word; margin-top: 4px; }
   .log-entry-note { font-size: 12px; color: var(--text-3); margin-top: 4px; font-style: italic; }
 
   /* Progress */
@@ -1201,7 +1204,7 @@ function updateSetsSection() {
   const sec = document.getElementById('setsSection');
   if (!exList.length) { sec.innerHTML=''; return; }
   let html = `<div style="margin-bottom:4px;font-size:12px;font-weight:500;color:var(--text-2);">Подходы и веса</div>
-  <div class="sets-grid">
+  <div class="sets-scroll"><div class="sets-grid">
     <div class="header">Упражнение</div>
     <div class="header" style="text-align:center;">Подх. 1</div>
     <div class="header" style="text-align:center;">Подх. 2</div>
@@ -1211,7 +1214,7 @@ function updateSetsSection() {
     html += `<div class="ex-name">${name}</div>`;
     for (let s=0;s<4;s++) html += `<input type="text" placeholder="—" id="set_${i}_${s}" style="text-align:center;font-size:12px;padding:5px;">`;
   });
-  html += '</div>';
+  html += '</div></div>';
   sec.innerHTML = html;
 }
 let editingLogId = null;
