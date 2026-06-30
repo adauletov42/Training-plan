@@ -903,54 +903,72 @@ function importMissedWorkouts() {
   const loggedDates = new Set(getLogs().map(l => l.date));
   const currentWeek = getWeek();
   const q = getCatchupQueue();
-  // Track what's already in the queue to avoid duplicates (by type sequence)
-  const existing = [...q];
+  // Deduplicate: dates already queued (from prior runs or toggleSkip)
+  const queuedDates = new Set(q.map(e => e.date).filter(Boolean));
   let added = 0;
 
   for (let w = 1; w <= currentWeek; w++) {
     const sched = getWeekSchedule(w);
     for (const d of sched) {
       if (REST_TYPES.includes(d.type)) continue;
-      if (d.skipped) continue;
       const dateStr = getDateForDay(w, d.day);
-      if (dateStr >= today) continue; // only past days
-      if (loggedDates.has(dateStr)) continue; // already completed
-      // Not logged, not skipped, not rest — missed
-      q.push({ type: d.type, date: dateStr });
+      if (dateStr >= today) continue;           // only past days
+      if (loggedDates.has(dateStr)) continue;   // already completed
+      if (queuedDates.has(dateStr)) continue;   // already queued
+      // Missed (whether or not explicitly marked skipped)
+      q.push({ type: d.type, day: d.day, name: d.name, date: dateStr });
+      queuedDates.add(dateStr);
       added++;
     }
   }
 
+  // Sort queue by original date so order is preserved
+  q.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   saveCatchupQueue(q);
   renderSchedule();
   const notice = added > 0
     ? `Добавлено ${added} пропущенных тренировок в дополнительные недели`
-    : 'Пропущенных тренировок не найдено — все выполнены или отмечены как пропуск';
+    : 'Пропущенных тренировок не найдено — все выполнены или уже в очереди';
   showRescheduleNotice(notice, '');
 }
 
 function getMaxWeek() {
   const q = getCatchupQueue();
   if (!q.length) return 20;
-  // Each catch-up week fits the same number of real training slots as the default week
+  // Pack by 7-day weeks: each week holds up to trainingSlotsPerWeek items
   const trainingSlotsPerWeek = DEFAULT_SCHEDULE.filter(d => !REST_TYPES.includes(d.type)).length;
   return 20 + Math.ceil(q.length / trainingSlotsPerWeek);
 }
 
 function getCatchupWeekSchedule(week) {
-  // Build a synthetic week for week > 20 from the catch-up queue
   const q = getCatchupQueue();
   const trainingSlotsPerWeek = DEFAULT_SCHEDULE.filter(d => !REST_TYPES.includes(d.type)).length;
   const offset = (week - 21) * trainingSlotsPerWeek;
   const slice = q.slice(offset, offset + trainingSlotsPerWeek);
-  let qIdx = 0;
+
+  // Build day-of-week map from queued items (day field preserved from original schedule)
+  const byDay = {};
+  for (const item of slice) {
+    if (item.day !== undefined && !byDay[item.day]) {
+      byDay[item.day] = item; // first item for this day-of-week wins
+    }
+  }
+  // Items without a day field fill remaining slots in order
+  const unplaced = slice.filter(item => item.day === undefined || slice.filter(s => s.day === item.day).indexOf(item) > 0);
+  let uIdx = 0;
+
   return DEFAULT_SCHEDULE.map(d => {
-    if (!REST_TYPES.includes(d.type) && qIdx < slice.length) {
-      const item = slice[qIdx++];
+    const placed = byDay[d.day];
+    if (placed) {
+      const meta = TYPE_META[placed.type] || {};
+      return { ...d, type: placed.type, badge: meta.badge || 'strength', focus: meta.focus || '', dur: meta.dur || '', rescheduled: true };
+    }
+    if (!REST_TYPES.includes(d.type) && uIdx < unplaced.length) {
+      const item = unplaced[uIdx++];
       const meta = TYPE_META[item.type] || {};
       return { ...d, type: item.type, badge: meta.badge || 'strength', focus: meta.focus || '', dur: meta.dur || '', rescheduled: true };
     }
-    return { ...d };
+    return { ...d, type: REST_TYPES[0], badge: 'rest', focus: 'Отдых', dur: '—', rescheduled: false };
   });
 }
 
@@ -958,20 +976,22 @@ function toggleSkip(idx) {
   const sched = getWeekSchedule(displayWeek);
   const wasSkipped = sched[idx].skipped;
   const workoutType = sched[idx].type;
+  const dateStr = getDateForDay(displayWeek, sched[idx].day);
   sched[idx].skipped = !wasSkipped;
   saveWeekSchedule(displayWeek, sched);
 
   if (!wasSkipped && !REST_TYPES.includes(workoutType)) {
-    // Add to catch-up queue — extra weeks beyond week 20
     const q = getCatchupQueue();
-    q.push({ type: workoutType });
-    saveCatchupQueue(q);
+    if (!q.some(e => e.date === dateStr)) {
+      q.push({ type: workoutType, day: sched[idx].day, name: sched[idx].name, date: dateStr });
+      q.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      saveCatchupQueue(q);
+    }
     showRescheduleNotice(workoutType, `дополнительная неделя ${getMaxWeek()}`);
   } else if (wasSkipped && !REST_TYPES.includes(workoutType)) {
-    // Un-skipping: remove last matching entry from catch-up queue
     const q = getCatchupQueue();
-    const lastIdx = q.map(e => e.type).lastIndexOf(workoutType);
-    if (lastIdx !== -1) { q.splice(lastIdx, 1); saveCatchupQueue(q); }
+    const i = q.findIndex(e => e.date === dateStr);
+    if (i !== -1) { q.splice(i, 1); saveCatchupQueue(q); }
   }
   renderSchedule();
 }
