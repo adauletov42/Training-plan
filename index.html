@@ -251,7 +251,10 @@
     Перетащите строки чтобы поменять тренировки местами · <i class="ti ti-edit" style="font-size:13px;"></i> — изменить тип · <i class="ti ti-ban" style="font-size:13px;"></i> — отметить пропуск
   </div>
   <div class="week-grid" id="weekGrid"></div>
-  <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;">
+  <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+    <button class="btn" onclick="importMissedWorkouts()" style="font-size:13px;">
+      <i class="ti ti-arrow-right-circle" aria-hidden="true"></i> Перенести пропущенные
+    </button>
     <button class="btn" onclick="resetWeek()" style="font-size:13px;">
       <i class="ti ti-refresh" aria-hidden="true"></i> Сбросить неделю
     </button>
@@ -895,6 +898,37 @@ function getCatchupQueue() {
 }
 function saveCatchupQueue(q) { localStorage.setItem('catchupQueue', JSON.stringify(q)); }
 
+function importMissedWorkouts() {
+  const today = new Date().toISOString().slice(0, 10);
+  const loggedDates = new Set(getLogs().map(l => l.date));
+  const currentWeek = getWeek();
+  const q = getCatchupQueue();
+  // Track what's already in the queue to avoid duplicates (by type sequence)
+  const existing = [...q];
+  let added = 0;
+
+  for (let w = 1; w <= currentWeek; w++) {
+    const sched = getWeekSchedule(w);
+    for (const d of sched) {
+      if (REST_TYPES.includes(d.type)) continue;
+      if (d.skipped) continue;
+      const dateStr = getDateForDay(w, d.day);
+      if (dateStr >= today) continue; // only past days
+      if (loggedDates.has(dateStr)) continue; // already completed
+      // Not logged, not skipped, not rest — missed
+      q.push({ type: d.type, date: dateStr });
+      added++;
+    }
+  }
+
+  saveCatchupQueue(q);
+  renderSchedule();
+  const notice = added > 0
+    ? `Добавлено ${added} пропущенных тренировок в дополнительные недели`
+    : 'Пропущенных тренировок не найдено — все выполнены или отмечены как пропуск';
+  showRescheduleNotice(notice, '');
+}
+
 function getMaxWeek() {
   const q = getCatchupQueue();
   if (!q.length) return 20;
@@ -950,7 +984,7 @@ function showRescheduleNotice(type, when) {
     el.style.cssText = 'position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.2);';
     document.body.appendChild(el);
   }
-  el.textContent = `«${type}» перенесена → ${when}`;
+  el.textContent = when ? `«${type}» перенесена → ${when}` : type;
   el.style.display = 'block';
   clearTimeout(el._timer);
   el._timer = setTimeout(() => { el.style.display = 'none'; }, 3500);
