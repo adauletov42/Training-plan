@@ -887,11 +887,52 @@ function changeType(idx, newType) {
 }
 
 // ── Toggle skip ────────────────────────────────────────────────────────────
+const REST_TYPES = ['Отдых', 'Восстановление'];
+
 function toggleSkip(idx) {
   const sched = getWeekSchedule(displayWeek);
-  sched[idx].skipped = !sched[idx].skipped;
+  const wasSkipped = sched[idx].skipped;
+  const workoutType = sched[idx].type;
+  sched[idx].skipped = !wasSkipped;
   saveWeekSchedule(displayWeek, sched);
+
+  // When skipping a real workout, reschedule it to the next rest/recovery slot
+  if (!wasSkipped && !REST_TYPES.includes(workoutType)) {
+    let rescheduled = false;
+    for (let w = displayWeek; w <= 20 && !rescheduled; w++) {
+      const ws = getWeekSchedule(w);
+      const startIdx = (w === displayWeek) ? idx + 1 : 0;
+      for (let i = startIdx; i < ws.length; i++) {
+        if (REST_TYPES.includes(ws[i].type) && !ws[i].skipped) {
+          const meta = TYPE_META[workoutType] || {};
+          ws[i].type = workoutType;
+          ws[i].badge = meta.badge || 'strength';
+          ws[i].focus = meta.focus || '';
+          ws[i].dur = meta.dur || '';
+          ws[i].rescheduled = true;
+          saveWeekSchedule(w, ws);
+          rescheduled = true;
+          showRescheduleNotice(workoutType, w === displayWeek ? `эта неделя, ${ws[i].name}` : `неделя ${w}, ${ws[i].name}`);
+          break;
+        }
+      }
+    }
+  }
   renderSchedule();
+}
+
+function showRescheduleNotice(type, when) {
+  let el = document.getElementById('rescheduleNotice');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'rescheduleNotice';
+    el.style.cssText = 'position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.2);';
+    document.body.appendChild(el);
+  }
+  el.textContent = `«${type}» перенесена → ${when}`;
+  el.style.display = 'block';
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.style.display = 'none'; }, 3500);
 }
 
 // ── Render schedule ────────────────────────────────────────────────────────
@@ -927,6 +968,7 @@ function renderSchedule() {
         <div class="day-name-row">
           <span class="day-name">${isToday?'▶ ':''}${d.name}</span>
           <span class="day-badge ${badgeCls}">${badgeLabel}</span>
+          ${d.rescheduled?'<span class="day-done-badge" style="background:var(--accent-bg);color:var(--accent-text);"><i class="ti ti-corner-down-right" aria-hidden="true"></i> Перенесено</span>':''}
           ${done?'<span class="day-done-badge"><i class="ti ti-check" aria-hidden="true"></i> Выполнено</span>':''}
         </div>
         <div class="day-focus">${d.focus || meta.focus} · ${d.dur || meta.dur}</div>
