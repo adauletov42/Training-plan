@@ -1144,6 +1144,19 @@ function renderDashboard() {
 }
 
 // ── Workout panel ──────────────────────────────────────────────────────────
+function getPhaseWeight(notes, week) {
+  if (!notes || notes === 'Во всех фазах') return '';
+  const phases = notes.split(' → ');
+  let chosen = phases[0];
+  for (const p of phases) {
+    const m = p.match(/Нед\.(\d+)/);
+    if (m && parseInt(m[1]) <= week) chosen = p;
+  }
+  const body = chosen.replace(/^Нед\.[^:]+:\s*/, '');
+  const slash = body.indexOf(' / ');
+  return slash >= 0 ? body.slice(slash + 3) : body;
+}
+
 function openWorkoutPanel(type, dayName) {
   const panel = document.getElementById('workoutPanel');
   panel.currentType = type;
@@ -1159,8 +1172,11 @@ function openWorkoutPanel(type, dayName) {
     <div class="exercise-table-wrap"><table class="exercise-table"><thead><tr>
       <th>Упражнение</th><th>Подходы × Повт.</th><th>Нагрузка по неделям</th><th>Отдых</th>
     </tr></thead><tbody>`;
+    const week = getWeek();
     w.exercises.forEach(ex => {
-      html += `<tr><td><div class="exercise-name">${ex.name}</div></td><td style="white-space:nowrap;">${ex.sets} × ${ex.reps}</td>
+      const wt = getPhaseWeight(ex.notes, week);
+      html += `<tr><td><div class="exercise-name">${ex.name}</div></td>
+        <td style="white-space:nowrap;">${ex.sets} × ${ex.reps}${wt ? '<div class="exercise-note" style="margin-top:2px;">'+wt+'</div>' : ''}</td>
         <td><div class="exercise-note">${ex.notes}</div></td><td style="white-space:nowrap;">${ex.rest}</td></tr>`;
     });
     html += `</tbody></table></div>
