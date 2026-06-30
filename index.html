@@ -932,43 +932,46 @@ function importMissedWorkouts() {
   showRescheduleNotice(notice, '');
 }
 
-function getMaxWeek() {
+function getSourceWeek(dateStr) {
+  if (!dateStr) return 0;
+  const d = new Date(dateStr);
+  return Math.max(1, Math.min(20, Math.floor((d - mondayOfWeek1()) / (7*24*3600*1000)) + 1));
+}
+
+function getCatchupGroups() {
   const q = getCatchupQueue();
-  if (!q.length) return 20;
-  // Pack by 7-day weeks: each week holds up to trainingSlotsPerWeek items
-  const trainingSlotsPerWeek = DEFAULT_SCHEDULE.filter(d => !REST_TYPES.includes(d.type)).length;
-  return 20 + Math.ceil(q.length / trainingSlotsPerWeek);
+  const groups = {};
+  for (const item of q) {
+    const wk = getSourceWeek(item.date);
+    if (!groups[wk]) groups[wk] = [];
+    groups[wk].push(item);
+  }
+  return Object.keys(groups).map(Number).sort((a, b) => a - b).map(wk => ({ sourceWeek: wk, items: groups[wk] }));
+}
+
+function getMaxWeek() {
+  const groups = getCatchupGroups();
+  return 20 + groups.length;
 }
 
 function getCatchupWeekSchedule(week) {
-  const q = getCatchupQueue();
-  const trainingSlotsPerWeek = DEFAULT_SCHEDULE.filter(d => !REST_TYPES.includes(d.type)).length;
-  const offset = (week - 21) * trainingSlotsPerWeek;
-  const slice = q.slice(offset, offset + trainingSlotsPerWeek);
+  const groups = getCatchupGroups();
+  const group = groups[week - 21];
+  if (!group) return DEFAULT_SCHEDULE.map(d => ({ ...d }));
 
-  // Build day-of-week map from queued items (day field preserved from original schedule)
+  // Map each missed workout to its original day-of-week
   const byDay = {};
-  for (const item of slice) {
-    if (item.day !== undefined && !byDay[item.day]) {
-      byDay[item.day] = item; // first item for this day-of-week wins
-    }
+  for (const item of group.items) {
+    if (item.day !== undefined) byDay[item.day] = item;
   }
-  // Items without a day field fill remaining slots in order
-  const unplaced = slice.filter(item => item.day === undefined || slice.filter(s => s.day === item.day).indexOf(item) > 0);
-  let uIdx = 0;
 
   return DEFAULT_SCHEDULE.map(d => {
-    const placed = byDay[d.day];
-    if (placed) {
-      const meta = TYPE_META[placed.type] || {};
-      return { ...d, type: placed.type, badge: meta.badge || 'strength', focus: meta.focus || '', dur: meta.dur || '', rescheduled: true };
-    }
-    if (!REST_TYPES.includes(d.type) && uIdx < unplaced.length) {
-      const item = unplaced[uIdx++];
+    const item = byDay[d.day];
+    if (item) {
       const meta = TYPE_META[item.type] || {};
       return { ...d, type: item.type, badge: meta.badge || 'strength', focus: meta.focus || '', dur: meta.dur || '', rescheduled: true };
     }
-    return { ...d, type: REST_TYPES[0], badge: 'rest', focus: 'Отдых', dur: '—', rescheduled: false };
+    return { ...d, type: 'Отдых', badge: 'rest', focus: 'Сон 8+ ч, прогулка', dur: '—', rescheduled: false };
   });
 }
 
@@ -1013,9 +1016,14 @@ function showRescheduleNotice(type, when) {
 // ── Render schedule ────────────────────────────────────────────────────────
 function renderSchedule() {
   const isCatchup = displayWeek > 20;
-  document.getElementById('weekNavLabel').textContent = isCatchup
-    ? `Доп. неделя ${displayWeek - 20} (перенесённые)`
-    : 'Неделя ' + displayWeek;
+  if (isCatchup) {
+    const groups = getCatchupGroups();
+    const group = groups[displayWeek - 21];
+    const srcLabel = group ? ` (пропуски нед. ${group.sourceWeek})` : '';
+    document.getElementById('weekNavLabel').textContent = `Доп. неделя ${displayWeek - 20}${srcLabel}`;
+  } else {
+    document.getElementById('weekNavLabel').textContent = 'Неделя ' + displayWeek;
+  }
   const today = new Date().getDay();
   const sched = getWeekSchedule(displayWeek);
   const grid = document.getElementById('weekGrid');
