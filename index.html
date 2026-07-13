@@ -1056,6 +1056,7 @@ function renderSchedule() {
       <div class="day-main">
         <div class="day-name-row">
           <span class="day-name">${isToday?'▶ ':''}${d.name}</span>
+          <span style="font-size:11px;color:var(--text-3);">${dayDate.slice(5).replace('-','.')}</span>
           <span class="day-badge ${badgeCls}">${badgeLabel}</span>
           ${d.rescheduled?'<span class="day-done-badge" style="background:var(--accent-bg);color:var(--accent-text);"><i class="ti ti-corner-down-right" aria-hidden="true"></i> Перенесено</span>':''}
           ${done?'<span class="day-done-badge"><i class="ti ti-check" aria-hidden="true"></i> Выполнено</span>':''}
