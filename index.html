@@ -97,6 +97,7 @@
   .badge-bjj      { background: var(--teal-bg); color: var(--teal-text); }
   .badge-rest     { background: var(--bg); color: var(--text-3); }
   .badge-recovery { background: var(--green-bg); color: var(--green-text); }
+  .badge-volleyball { background: var(--amber-bg); color: var(--amber-text); }
   .badge-skip     { background: var(--red-bg); color: var(--red-text); }
   .day-done-badge { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: var(--r-md); white-space: nowrap; background: var(--green-bg); color: var(--green-text); display: inline-flex; align-items: center; gap: 4px; }
   .day-row.done { border-color: var(--green-text, #2e7d32); }
@@ -278,6 +279,7 @@
             <option value="Full Body B">Full Body Б</option>
             <option value="BJJ">БЖЖ</option>
             <option value="Recovery">Восстановление</option>
+            <option value="Volleyball">Волейбол</option>
           </select>
         </div>
         <div class="form-group" style="min-width:80px;max-width:100px;"><label>Вес (кг)</label><input type="number" id="logBodyWeight" step="0.1" placeholder="105"></div>
@@ -485,7 +487,7 @@ const START_DATE = new Date('2026-06-16');
 const DEFAULT_SCHEDULE = [
   { day: 1, name: 'Понедельник', type: 'Full Body A', badge: 'strength', dur: '60 мин', focus: 'Верх + метаболический финишер' },
   { day: 2, name: 'Вторник',     type: 'БЖЖ',         badge: 'bjj',      dur: '90 мин', focus: 'Техника + спарринг (полная интенсивность)' },
-  { day: 3, name: 'Среда',       type: 'Восстановление',badge:'recovery', dur: '30–40 мин', focus: 'МФР, ходьба, мобильность' },
+  { day: 3, name: 'Среда',       type: 'Волейбол',      badge: 'volleyball', dur: '90 мин', focus: 'Игра + техника подачи и приёма' },
   { day: 4, name: 'Четверг',     type: 'БЖЖ',         badge: 'bjj',      dur: '90 мин', focus: 'Техника + спарринг (средняя интенсивность)' },
   { day: 5, name: 'Пятница',     type: 'Full Body Б',  badge: 'strength', dur: '60 мин', focus: 'Низ + метаболический финишер' },
   { day: 6, name: 'Суббота',     type: 'БЖЖ',         badge: 'bjj',      dur: '90 мин', focus: 'Техника + спарринг (контроль интенсивности)' },
@@ -497,10 +499,11 @@ const TYPE_META = {
   'Full Body Б':   { badge: 'strength', dur: '60 мин',    focus: 'Низ + метаболический финишер' },
   'БЖЖ':           { badge: 'bjj',      dur: '90 мин',    focus: 'Техника + спарринг' },
   'Восстановление':{ badge: 'recovery', dur: '30–40 мин', focus: 'МФР, ходьба, мобильность' },
+  'Волейбол':      { badge: 'volleyball', dur: '90 мин',  focus: 'Игра + техника подачи и приёма' },
   'Отдых':         { badge: 'rest',     dur: '—',         focus: 'Сон 8+ ч, прогулка' },
 };
 
-const WORKOUT_TYPES = ['Full Body A', 'Full Body Б', 'БЖЖ', 'Восстановление', 'Отдых'];
+const WORKOUT_TYPES = ['Full Body A', 'Full Body Б', 'БЖЖ', 'Восстановление', 'Волейбол', 'Отдых'];
 
 const WORKOUTS = {
   'Full Body A': {
@@ -538,6 +541,13 @@ const WORKOUTS = {
       { name: 'Ходьба', dur: '20–30 мин', zone: 'Зона 1 (89–107 уд/мин)' },
       { name: 'Box breathing 4-4-4-4', dur: '5 мин', zone: 'Дыхательные упражнения' },
       { name: 'Стретчинг', dur: '10 мин', zone: 'Бёдра, пах, плечевой пояс' },
+    ]
+  },
+  'Волейбол': {
+    blocks: [
+      { name: 'Разминка + подача', dur: '15 мин', zone: 'Зона 2 (107–124 уд/мин)' },
+      { name: 'Игра 6х6', dur: '60 мин', zone: 'Зона 3–4 (125–160 уд/мин)' },
+      { name: 'Заминка + стретчинг', dur: '15 мин', zone: 'Зона 1 (89–107 уд/мин)' },
     ]
   }
 };
@@ -1205,7 +1215,7 @@ function goToLog() {
   const t = document.getElementById('workoutPanel').currentType;
   closeWorkoutPanel();
   showTab('log');
-  const map = {'Full Body A':'Full Body A','Full Body Б':'Full Body B','БЖЖ':'BJJ','Восстановление':'Recovery'};
+  const map = {'Full Body A':'Full Body A','Full Body Б':'Full Body B','БЖЖ':'BJJ','Восстановление':'Recovery','Волейбол':'Volleyball'};
   if (map[t]) document.getElementById('logType').value = map[t];
   updateSetsSection();
 }
