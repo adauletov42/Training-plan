@@ -483,7 +483,7 @@
 </div>
 
 <script>
-const START_DATE = new Date('2026-06-16');
+const START_DATE = new Date(2026, 5, 16); // local midnight, not UTC
 
 const DEFAULT_SCHEDULE = [
   { day: 1, name: 'Понедельник', type: 'Full Body A', badge: 'strength', dur: '60 мин', focus: 'Верх + метаболический финишер' },
@@ -818,6 +818,10 @@ function mondayOfWeek1() {
   monday.setDate(monday.getDate() - offsetFromMonday);
   return monday;
 }
+function localDateStr(d) {
+  d = d || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
 function getWeek() {
   const diff = Math.floor((new Date() - mondayOfWeek1()) / (7*24*3600*1000)) + 1;
   return Math.max(1, Math.min(20, diff));
@@ -827,7 +831,7 @@ function getDateForDay(week, dayOfWeek) {
   const offset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
   const d = new Date(monday);
   d.setDate(d.getDate() + (week - 1) * 7 + offset);
-  return d.toISOString().slice(0, 10);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 function isDayLogged(dateStr) {
   return getLogs().some(l => l.date === dateStr);
@@ -921,7 +925,7 @@ function getCatchupQueue() {
 function saveCatchupQueue(q) { localStorage.setItem('catchupQueue', JSON.stringify(q)); }
 
 function importMissedWorkouts() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   const loggedDates = new Set(getLogs().map(l => l.date));
   const currentWeek = getWeek();
   const q = getCatchupQueue();
@@ -1148,7 +1152,7 @@ function renderDashboard() {
       </div>
       <div style="font-size:14px;color:var(--text-3);">Эта тренировка отмечена как пропущенная</div>`;
     } else {
-      const todayDate = new Date().toISOString().slice(0,10);
+      const todayDate = localDateStr();
       const todayDone = isDayLogged(todayDate);
       todayEl.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
@@ -1343,7 +1347,7 @@ function editLog(id) {
 }
 function cancelEditLog() {
   editingLogId = null;
-  document.getElementById('logDate').value = new Date().toISOString().slice(0,10);
+  document.getElementById('logDate').value = localDateStr();
   document.getElementById('logType').value = 'Full Body A';
   updateSetsSection();
   document.getElementById('logBodyWeight').value = '';
@@ -1482,7 +1486,7 @@ function saveStrength() {
   const kg=parseFloat(document.getElementById('strengthKg').value);
   if (!kg) return;
   const data=JSON.parse(localStorage.getItem('strengthRecords')||'[]');
-  const entry={date:new Date().toISOString().slice(0,10),ex,kg};
+  const entry={date:localDateStr(),ex,kg};
   data.unshift(entry);
   localStorage.setItem('strengthRecords',JSON.stringify(data));
   pushStrength(entry);
@@ -1592,7 +1596,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   displayWeek = getWeek();
   document.getElementById('logType').addEventListener('change', updateSetsSection);
   updateSetsSection();
-  const today = new Date().toISOString().slice(0,10);
+  const today = localDateStr();
   document.getElementById('logDate').value = today;
   document.getElementById('ciDate').value = today;
   renderCheckinHistory();
