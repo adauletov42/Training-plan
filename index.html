@@ -98,6 +98,7 @@
   .badge-rest     { background: var(--bg); color: var(--text-3); }
   .badge-recovery { background: var(--green-bg); color: var(--green-text); }
   .badge-skip     { background: var(--red-bg); color: var(--red-text); }
+  .badge-injury   { background: var(--amber-bg); color: var(--amber-text); }
   .day-done-badge { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: var(--r-md); white-space: nowrap; background: var(--green-bg); color: var(--green-text); display: inline-flex; align-items: center; gap: 4px; }
   .day-row.done { border-color: var(--green-text, #2e7d32); }
 
@@ -538,6 +539,14 @@ const WORKOUTS = {
       { name: 'Ходьба', dur: '20–30 мин', zone: 'Зона 1 (89–107 уд/мин)' },
       { name: 'Box breathing 4-4-4-4', dur: '5 мин', zone: 'Дыхательные упражнения' },
       { name: 'Стретчинг', dur: '10 мин', zone: 'Бёдра, пах, плечевой пояс' },
+    ],
+    kneeBlocks: [
+      { name: 'Изометрическое напряжение квадрицепса', sets: '3 × 30 сек', note: 'Лёжа, прижать колено к полу' },
+      { name: 'Подъём прямой ноги', sets: '3 × 15', note: 'Лёжа на спине, нога прямая' },
+      { name: 'Скольжение пяткой', sets: '3 × 15', note: 'Медленно сгибать и разгибать колено' },
+      { name: 'Разгибание в колене (TKE)', sets: '3 × 15', note: 'С резиновой лентой, стоя' },
+      { name: 'Раскрытие ракушки', sets: '3 × 15', note: 'На боку, укрепление ягодиц и стабилизаторов' },
+      { name: 'Подъём на ступеньку', sets: '3 × 10', note: 'Ступенька 10–15 см, медленно' },
     ]
   }
 };
@@ -981,9 +990,17 @@ function getCatchupWeekSchedule(week) {
 function toggleSkip(idx) {
   const sched = getWeekSchedule(displayWeek);
   const wasSkipped = sched[idx].skipped;
+  const wasInjury = sched[idx].injury;
   const workoutType = sched[idx].type;
   const dateStr = getDateForDay(displayWeek, sched[idx].day);
-  sched[idx].skipped = !wasSkipped;
+  // 3-state cycle: normal → Пропуск → Травма → normal
+  if (!wasSkipped) {
+    sched[idx].skipped = true; sched[idx].injury = false;
+  } else if (!wasInjury) {
+    sched[idx].skipped = true; sched[idx].injury = true;
+  } else {
+    sched[idx].skipped = false; sched[idx].injury = false;
+  }
   saveWeekSchedule(displayWeek, sched);
 
   if (!wasSkipped && !REST_TYPES.includes(workoutType)) {
@@ -994,7 +1011,7 @@ function toggleSkip(idx) {
       saveCatchupQueue(q);
     }
     showRescheduleNotice(workoutType, `дополнительная неделя ${getMaxWeek()}`);
-  } else if (wasSkipped && !REST_TYPES.includes(workoutType)) {
+  } else if (wasSkipped && sched[idx].skipped === false && !REST_TYPES.includes(workoutType)) {
     const q = getCatchupQueue();
     const i = q.findIndex(e => e.date === dateStr);
     if (i !== -1) { q.splice(i, 1); saveCatchupQueue(q); }
@@ -1034,11 +1051,12 @@ function renderSchedule() {
   grid.innerHTML = sched.map((d, idx) => {
     const isToday = d.day === today && displayWeek === getWeek();
     const skipped = d.skipped;
+    const injury = d.injury;
     const dayDate = getDateForDay(displayWeek, d.day);
     const done = !skipped && isDayLogged(dayDate);
     const meta = TYPE_META[d.type] || { badge:'rest', dur:'—', focus:'' };
-    const badgeCls = skipped ? 'badge-skip' : 'badge-' + (d.badge || meta.badge);
-    const badgeLabel = skipped ? 'Пропуск' : d.type;
+    const badgeCls = injury ? 'badge-injury' : skipped ? 'badge-skip' : 'badge-' + (d.badge || meta.badge);
+    const badgeLabel = injury ? 'Травма' : skipped ? 'Пропуск' : d.type;
 
     const typeOptions = WORKOUT_TYPES.map(t =>
       `<option value="${t}" ${t===d.type?'selected':''}>${t}</option>`
@@ -1195,6 +1213,19 @@ function openWorkoutPanel(type, dayName) {
       </div>`;
     });
     html += '</div>';
+    if (w.kneeBlocks) {
+      html += `<div style="margin-top:16px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🦵 Восстановление колена</div>
+        <div class="exercise-table-wrap"><table class="exercise-table"><thead><tr>
+          <th>Упражнение</th><th>Подходы × Повт.</th><th>Комментарий</th>
+        </tr></thead><tbody>`;
+      w.kneeBlocks.forEach(b => {
+        html += `<tr><td><div class="exercise-name">${b.name}</div></td>
+          <td style="white-space:nowrap;">${b.sets}</td>
+          <td><div class="exercise-note">${b.note}</div></td></tr>`;
+      });
+      html += `</tbody></table></div></div>`;
+    }
   }
   document.getElementById('panelContent').innerHTML = html;
   panel.classList.add('open');
