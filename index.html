@@ -620,7 +620,13 @@ const WORKOUTS = {
 // ── Supabase (cloud sync) ────────────────────────────────────────────────
 const SUPABASE_URL = 'https://ufnityjbeaccwgxtjikl.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_bPBjH4MJ_az3UGTtozPuFg_DY31scCA';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// CDN может быть недоступен (офлайн, блокировка, сбой jsdelivr). Приложение
+// работает локально и без него, поэтому клиент — необязательная зависимость:
+// при его отсутствии sb === null, а синхронизация честно выключается.
+const sb = (window.supabase && typeof window.supabase.createClient === 'function')
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+const SYNC_UNAVAILABLE_MSG = 'Синхронизация недоступна: не загрузилась библиотека Supabase. Данные сохраняются локально; проверьте соединение и обновите страницу.';
 
 let currentSession = null;
 
@@ -635,6 +641,14 @@ function closeAuthPanelBg(e) { if (e.target === document.getElementById('authPan
 function refreshAuthPanelView() {
   const formView = document.getElementById('authFormView');
   const loggedView = document.getElementById('authLoggedInView');
+  if (!sb) {
+    formView.style.display = 'none';
+    loggedView.style.display = 'none';
+    const err = document.getElementById('authError');
+    err.style.color = 'var(--text-2)';
+    err.textContent = SYNC_UNAVAILABLE_MSG;
+    return;
+  }
   if (currentSession) {
     formView.style.display = 'none';
     loggedView.style.display = 'flex';
@@ -648,6 +662,11 @@ function refreshAuthPanelView() {
 function updateAuthBar() {
   const text = document.getElementById('authStatusText');
   const btn = document.getElementById('authBarBtn');
+  if (!sb) {
+    text.innerHTML = '<i class="ti ti-cloud-off" aria-hidden="true"></i> Локально · синхронизация недоступна';
+    btn.textContent = 'Подробнее';
+    return;
+  }
   if (currentSession) {
     text.innerHTML = '<i class="ti ti-cloud-check" aria-hidden="true"></i> ' + currentSession.user.email;
     btn.textContent = 'Аккаунт';
@@ -662,6 +681,7 @@ async function doSignUp() {
   const password = document.getElementById('authPassword').value;
   const err = document.getElementById('authError');
   err.style.color = 'var(--red)';
+  if (!sb) { err.textContent = SYNC_UNAVAILABLE_MSG; return; }
   if (!email || password.length < 6) { err.textContent = 'Введите email и пароль (мин. 6 символов)'; return; }
   const { error } = await sb.auth.signUp({ email, password });
   if (error) { err.textContent = error.message; return; }
@@ -673,6 +693,7 @@ async function doSignIn() {
   const password = document.getElementById('authPassword').value;
   const err = document.getElementById('authError');
   err.style.color = 'var(--red)';
+  if (!sb) { err.textContent = SYNC_UNAVAILABLE_MSG; return; }
   if (!email || !password) { err.textContent = 'Введите email и пароль'; return; }
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) { err.textContent = error.message; return; }
@@ -681,20 +702,24 @@ async function doSignIn() {
   closeAuthPanel();
 }
 async function doSignOut() {
+  if (!sb) return closeAuthPanel();
   await sb.auth.signOut();
   closeAuthPanel();
 }
 
-sb.auth.onAuthStateChange((event, session) => {
-  currentSession = session;
-  updateAuthBar();
-  refreshAuthPanelView();
-  if (event === 'SIGNED_IN') {
-    syncOnLogin();
-  }
-});
+if (sb) {
+  sb.auth.onAuthStateChange((event, session) => {
+    currentSession = session;
+    updateAuthBar();
+    refreshAuthPanelView();
+    if (event === 'SIGNED_IN') {
+      syncOnLogin();
+    }
+  });
+}
 
 async function syncOnLogin() {
+  if (!sb) return { logsCount: 0, errors: [SYNC_UNAVAILABLE_MSG] };
   const pushErrors = await pushAllLocalData();
   const { logsCount, errors: pullErrors } = await pullAllData();
   renderEverything();
@@ -704,6 +729,7 @@ async function syncOnLogin() {
 async function manualSync() {
   const btn = document.querySelector('#authLoggedInView .btn:not(.btn-danger)');
   const statusEl = document.getElementById('syncStatusMsg');
+  if (!sb) { if (statusEl) statusEl.textContent = SYNC_UNAVAILABLE_MSG; return; }
   if (btn) btn.disabled = true;
   if (statusEl) statusEl.textContent = 'Синхронизация...';
   try {
@@ -729,6 +755,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 async function pushAllLocalData() {
+  if (!sb) return [SYNC_UNAVAILABLE_MSG];
   const errors = [];
   if (!currentSession) return errors;
   try {
@@ -789,6 +816,7 @@ async function pushAllLocalData() {
 }
 
 async function pullAllData() {
+  if (!sb) return { logsCount: 0, errors: [SYNC_UNAVAILABLE_MSG] };
   const [{ data: logs, error: e1 }, { data: checkins, error: e2 }, { data: cooper, error: e3 }, { data: strength, error: e4 }, { data: sched, error: e5 }, { data: cweights, error: e6 }] = await Promise.all([
     sb.from('workout_logs').select('*').order('date', { ascending: false }),
     sb.from('checkins').select('*'),
@@ -1831,12 +1859,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderCheckinHistory();
   renderDashboard();
 
-  const { data: { session } } = await sb.auth.getSession();
-  currentSession = session;
-  updateAuthBar();
-  if (session) {
-    await syncOnLogin();
+  if (sb) {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      currentSession = session;
+      if (session) { updateAuthBar(); await syncOnLogin(); }
+    } catch (e) {
+      console.error('Auth session lookup failed:', e);
+    }
   }
+  updateAuthBar();
 });
 </script>
 </body>
