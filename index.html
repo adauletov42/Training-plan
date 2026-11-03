@@ -824,7 +824,7 @@ function localDateStr(d) {
 }
 function getWeek() {
   const diff = Math.floor((new Date() - mondayOfWeek1()) / (7*24*3600*1000)) + 1;
-  return Math.max(1, Math.min(20, diff));
+  return Math.max(1, diff);
 }
 function getDateForDay(week, dayOfWeek) {
   const monday = mondayOfWeek1();
@@ -852,7 +852,8 @@ function getWeekSchedule(week) {
     const saved = JSON.parse(localStorage.getItem(getOverrideKey(week)));
     if (saved && saved.length === 7) return saved;
   } catch {}
-  return week > 20 ? getCatchupWeekSchedule(week) : DEFAULT_SCHEDULE.map(d => ({ ...d }));
+  const baseWeeks = Math.max(getWeek(), 20);
+  return week > baseWeeks ? getCatchupWeekSchedule(week) : DEFAULT_SCHEDULE.map(d => ({ ...d }));
 }
 
 function saveWeekSchedule(week, sched) {
@@ -961,7 +962,7 @@ function importMissedWorkouts() {
 function getSourceWeek(dateStr) {
   if (!dateStr) return 0;
   const d = new Date(dateStr);
-  return Math.max(1, Math.min(20, Math.floor((d - mondayOfWeek1()) / (7*24*3600*1000)) + 1));
+  return Math.max(1, Math.floor((d - mondayOfWeek1()) / (7*24*3600*1000)) + 1);
 }
 
 function getCatchupGroups() {
@@ -977,12 +978,13 @@ function getCatchupGroups() {
 
 function getMaxWeek() {
   const groups = getCatchupGroups();
-  return 20 + groups.length;
+  return Math.max(getWeek(), 20) + groups.length;
 }
 
 function getCatchupWeekSchedule(week) {
   const groups = getCatchupGroups();
-  const group = groups[week - 21];
+  const baseWeeks = Math.max(getWeek(), 20);
+  const group = groups[week - baseWeeks - 1];
   if (!group) return DEFAULT_SCHEDULE.map(d => ({ ...d }));
 
   // Map each missed workout to its original day-of-week
@@ -1049,12 +1051,13 @@ function showRescheduleNotice(type, when) {
 
 // ── Render schedule ────────────────────────────────────────────────────────
 function renderSchedule() {
-  const isCatchup = displayWeek > 20;
+  const baseWeeks = Math.max(getWeek(), 20);
+  const isCatchup = displayWeek > baseWeeks;
   if (isCatchup) {
     const groups = getCatchupGroups();
-    const group = groups[displayWeek - 21];
+    const group = groups[displayWeek - baseWeeks - 1];
     const srcLabel = group ? ` (пропуски нед. ${group.sourceWeek})` : '';
-    document.getElementById('weekNavLabel').textContent = `Доп. неделя ${displayWeek - 20}${srcLabel}`;
+    document.getElementById('weekNavLabel').textContent = `Доп. неделя ${displayWeek - baseWeeks}${srcLabel}`;
   } else {
     document.getElementById('weekNavLabel').textContent = 'Неделя ' + displayWeek;
   }
@@ -1129,7 +1132,7 @@ function renderDashboard() {
   const lastLog = getLastLog();
   const lastWeight = lastLog ? lastLog.bodyWeight : null;
   const metrics = [
-    { label:'Текущая неделя', value:week+' / 20', sub:'из 20 недель' },
+    { label:'Текущая неделя', value:'Неделя ' + week, sub: week <= 20 ? 'из 20 недель плана' : 'продолжение' },
     { label:'Вес тела', value:(lastWeight||'–')+(lastWeight?' кг':''), sub:lastWeight?'последняя запись':'нет данных' },
     { label:'Фаза', value:'Фаза '+getPhase(week), sub:['Адаптация','Развитие','Пик'][getPhase(week)-1] },
     { label:'Дефицит веса', value:lastWeight?(lastWeight-90).toFixed(1)+' кг':'–', sub:'до цели 90 кг' },
