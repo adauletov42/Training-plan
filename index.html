@@ -1300,7 +1300,10 @@ function goToLog() {
 function getSetsExercises(type) {
   if (type==='Full Body A') return WORKOUTS['Full Body A'].exercises.map(e=>e.name);
   if (type==='Full Body B') return WORKOUTS['Full Body Б'].exercises.map(e=>e.name);
-  if (type==='Recovery') return WORKOUTS['Восстановление'].shoulderBlocks.map(b=>b.name);
+  if (type==='Recovery') return [
+    ...WORKOUTS['Восстановление'].shoulderBlocks.map(b=>b.name),
+    ...WORKOUTS['Восстановление'].kneeBlocks.map(b=>b.name),
+  ];
   return [];
 }
 function updateSetsSection() {
