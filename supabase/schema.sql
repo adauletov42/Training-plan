@@ -60,3 +60,13 @@ create table if not exists public.schedule_overrides (
 alter table public.schedule_overrides enable row level security;
 create policy "schedule_overrides_own" on public.schedule_overrides
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create table if not exists public.cycle_weights (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  cycle int not null,
+  data jsonb not null,
+  primary key (user_id, cycle)
+);
+alter table public.cycle_weights enable row level security;
+create policy "cycle_weights_own" on public.cycle_weights
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
