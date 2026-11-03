@@ -320,6 +320,10 @@
     <div id="ciHistory" style="margin-top:1rem;"></div>
   </div>
   <div class="card">
+    <div class="card-title"><i class="ti ti-chart-bar" aria-hidden="true"></i> Анализ тренировок</div>
+    <div id="workoutAnalysis"></div>
+  </div>
+  <div class="card">
     <div class="card-title"><i class="ti ti-weight" aria-hidden="true"></i> Вес тела</div>
     <div class="chart-wrap" style="padding:0.5rem;"><canvas id="weightChart" height="160"></canvas></div>
   </div>
@@ -1531,6 +1535,7 @@ function renderProgress() {
   logs.filter(l=>l.feeling).forEach(l=>{ if(!feelingMap[l.date]) feelingMap[l.date]=l.feeling; });
   checkins.filter(c=>c.feeling).forEach(c=>{ feelingMap[c.date]=c.feeling; });
   const feelingData=Object.entries(feelingMap).sort((a,b)=>a[0].localeCompare(b[0])).map(([x,y])=>({x,y}));
+  renderWorkoutAnalysis(logs, checkins);
   renderLineChart('weightChart',weightData,'Вес (кг)','#534AB7',85,110);
   renderLineChart('feelingChart',feelingData,'Самочувствие','#0F6E56',0,10);
   renderMeasurements(checkins);
@@ -1560,6 +1565,102 @@ function renderProgress() {
   } else {
     srEl.innerHTML='<div style="font-size:13px;color:var(--text-3);">Нет записей</div>';
   }
+}
+function renderWorkoutAnalysis(logs, checkins) {
+  const el = document.getElementById('workoutAnalysis');
+  if (!el) return;
+  if (!logs.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text-3);padding:4px 0;">Нет данных — начните записывать тренировки.</div>';
+    return;
+  }
+
+  // ── Totals ──
+  const total = logs.length;
+  const currentWeek = getWeek();
+  const plannedWorkouts = currentWeek * 4; // ~4 тренировки в неделю (пн,вт,чт,пт)
+  const completionPct = Math.min(100, Math.round(total / plannedWorkouts * 100));
+
+  // ── Streak ──
+  const logDates = new Set(logs.map(l => l.date));
+  let streak = 0;
+  const today = localDateStr();
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    if (logDates.has(localDateStr(d))) streak++; else if (i > 0) break;
+  }
+
+  // ── By type ──
+  const typeMap = { 'Full Body A':'Full Body A','Full Body B':'Full Body Б','BJJ':'БЖЖ','Recovery':'Восстановление' };
+  const byType = {};
+  logs.forEach(l => { const t = typeMap[l.type]||l.type; byType[t] = (byType[t]||0)+1; });
+
+  // ── Weekly volume (last 8 weeks) ──
+  const weeklyCount = {};
+  logs.forEach(l => {
+    const d = new Date(l.date + 'T12:00:00');
+    const wk = Math.max(1, Math.floor((d - mondayOfWeek1()) / (7*24*3600*1000)) + 1);
+    weeklyCount[wk] = (weeklyCount[wk]||0) + 1;
+  });
+  const recentWeeks = Array.from({length:8}, (_,i) => currentWeek - 7 + i).filter(w=>w>=1);
+  const maxWC = Math.max(1, ...recentWeeks.map(w=>weeklyCount[w]||0));
+
+  // ── Averages ──
+  const avgSleep = logs.filter(l=>l.sleep).reduce((s,l)=>s+l.sleep,0) / (logs.filter(l=>l.sleep).length||1);
+  const avgFeeling = logs.filter(l=>l.feeling).reduce((s,l)=>s+l.feeling,0) / (logs.filter(l=>l.feeling).length||1);
+
+  // ── This week vs last week ──
+  const thisWeekCount = weeklyCount[currentWeek]||0;
+  const lastWeekCount = weeklyCount[currentWeek-1]||0;
+  const weekTrend = thisWeekCount - lastWeekCount;
+
+  el.innerHTML = `
+    <div class="metrics" style="margin-bottom:16px;">
+      <div class="metric"><div class="metric-label">Всего тренировок</div><div class="metric-value">${total}</div><div class="metric-sub">за всё время</div></div>
+      <div class="metric"><div class="metric-label">Выполнение плана</div><div class="metric-value">${completionPct}%</div><div class="metric-sub">${total} из ~${plannedWorkouts}</div></div>
+      <div class="metric"><div class="metric-label">Серия подряд</div><div class="metric-value">${streak}</div><div class="metric-sub">${streak===1?'день':'дней'}</div></div>
+      <div class="metric"><div class="metric-label">Эта неделя</div><div class="metric-value">${thisWeekCount}</div><div class="metric-sub" style="color:${weekTrend>0?'var(--green-text)':weekTrend<0?'var(--red-text)':'var(--text-3)'};">${weekTrend>0?'↑'+weekTrend+' vs пред.':weekTrend<0?'↓'+Math.abs(weekTrend)+' vs пред.':'= пред. неделя'}</div></div>
+    </div>
+
+    <div style="font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">По типам</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
+      ${Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([t,n])=>`
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:13px;min-width:120px;">${t}</div>
+          <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;">
+            <div style="height:100%;width:${Math.round(n/total*100)}%;background:var(--accent);border-radius:4px;"></div>
+          </div>
+          <div style="font-size:13px;font-weight:500;min-width:32px;text-align:right;">${n}</div>
+        </div>`).join('')}
+    </div>
+
+    <div style="font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Нагрузка по неделям (последние 8)</div>
+    <div style="display:flex;align-items:flex-end;gap:6px;height:60px;margin-bottom:4px;">
+      ${recentWeeks.map(w=>{
+        const cnt = weeklyCount[w]||0;
+        const h = Math.round(cnt/maxWC*100);
+        const isCur = w===currentWeek;
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;">
+          <div style="font-size:10px;color:var(--text-3);">${cnt||''}</div>
+          <div style="width:100%;height:${Math.max(4,h)}%;background:${isCur?'var(--accent)':'var(--accent-bg)'};border-radius:3px 3px 0 0;min-height:4px;"></div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="display:flex;gap:6px;">
+      ${recentWeeks.map(w=>`<div style="flex:1;text-align:center;font-size:10px;color:var(--text-3);">Н${w}</div>`).join('')}
+    </div>
+
+    ${(logs.filter(l=>l.sleep).length || logs.filter(l=>l.feeling).length) ? `
+    <div style="display:flex;gap:12px;margin-top:16px;">
+      ${logs.filter(l=>l.sleep).length?`<div style="flex:1;padding:10px;background:var(--accent-bg);border-radius:var(--r-md);text-align:center;">
+        <div style="font-size:18px;font-weight:600;color:var(--accent-text);">${avgSleep.toFixed(1)} ч</div>
+        <div style="font-size:12px;color:var(--text-2);">средний сон</div>
+      </div>`:''}
+      ${logs.filter(l=>l.feeling).length?`<div style="flex:1;padding:10px;background:var(--green-bg);border-radius:var(--r-md);text-align:center;">
+        <div style="font-size:18px;font-weight:600;color:var(--green-text);">${avgFeeling.toFixed(1)}/10</div>
+        <div style="font-size:12px;color:var(--text-2);">среднее самочувствие</div>
+      </div>`:''}
+    </div>` : ''}
+  `;
 }
 function renderMeasurements(checkins) {
   const el = document.getElementById('measurementsChart');
