@@ -836,7 +836,7 @@ function getDateForDay(week, dayOfWeek) {
 function isDayLogged(dateStr) {
   return getLogs().some(l => l.date === dateStr);
 }
-function getPhase(w) { return w<=6?1:w<=14?2:3; }
+function getPhase(w) { const c=((w-1)%20)+1; return c<=6?1:c<=14?2:3; }
 function getPhaseDesc(w) {
   const p=getPhase(w);
   return p===1?'Фаза 1 — Адаптация: техника базовых упражнений, RPE 6–7, 3–4 раунда финишера':
@@ -1182,11 +1182,12 @@ function renderDashboard() {
 // ── Workout panel ──────────────────────────────────────────────────────────
 function getPhaseWeight(notes, week) {
   if (!notes || notes === 'Во всех фазах') return '';
+  const cycleWeek = ((week - 1) % 20) + 1;
   const phases = notes.split(' → ');
   let chosen = phases[0];
   for (const p of phases) {
     const m = p.match(/Нед\.(\d+)/);
-    if (m && parseInt(m[1]) <= week) chosen = p;
+    if (m && parseInt(m[1]) <= cycleWeek) chosen = p;
   }
   const body = chosen.replace(/^Нед\.[^:]+:\s*/, '');
   const slash = body.indexOf(' / ');
