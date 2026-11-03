@@ -1,21 +1,21 @@
-const CACHE = 'training-v8';
+const CACHE = 'training-v9';
 
-// Локальные файлы: без них офлайна нет, поэтому их кэширование обязано пройти.
+// Всё приложение локально: внешних зависимостей больше нет, supabase-js и
+// шрифт иконок лежат в vendor/. Раньше их адреса на CDN стояли в этом же
+// addAll, и одна неудачная загрузка срывала установку целиком — кэш оставался
+// пустым вместе с index.html, и офлайна не было вообще.
 const CORE = [
   '/Training-plan/',
   '/Training-plan/index.html',
   '/Training-plan/manifest.json',
   '/Training-plan/icon-192.png',
   '/Training-plan/icon-512.png',
+  '/Training-plan/vendor/supabase.js',
+  '/Training-plan/vendor/tabler-icons-subset.css',
+  '/Training-plan/vendor/tabler-icons-subset.woff2',
 ];
 
-// Внешние файлы: приложение работает и без них. Раньше они лежали в одном
-// addAll с локальными, и недоступность CDN срывала установку целиком — тогда
-// не кэшировалось вообще ничего, включая index.html, и офлайна не было совсем.
-const OPTIONAL = [
-  'https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css',
-  'https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/fonts/tabler-icons.woff2',
-];
+const OPTIONAL = [];
 
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
