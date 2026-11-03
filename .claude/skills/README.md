@@ -30,3 +30,10 @@ folder is a verbatim copy of the upstream skill directory plus its LICENSE.
 
 - `impeccable/scripts/impeccable` is a launcher that downloads a self-contained
   binary on first run; it needs outbound network access.
+- `.claude/settings.json` pre-approves that launcher so it runs without a
+  permission prompt. Permission rules are prefix matches on the command text,
+  so the allow list carries the relative spelling and this repo's cloud-session
+  absolute path. On a different checkout path, add that path's spelling or
+  invoke the launcher by its relative path from the repo root. Note that
+  pre-approving it means every session in this repo will run a binary the
+  launcher downloads, without asking first.

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "allow": [
+      "Bash(.claude/skills/impeccable/scripts/impeccable:*)",
+      "Bash(./.claude/skills/impeccable/scripts/impeccable:*)",
+      "Bash(/home/user/Training-plan/.claude/skills/impeccable/scripts/impeccable:*)"
+    ]
+  }
+}
