@@ -308,6 +308,12 @@
         <div class="form-group" style="min-width:80px;max-width:100px;"><label>Сон (ч)</label><input type="number" id="ciSleep" step="0.5" placeholder="7.5"></div>
         <div class="form-group" style="min-width:90px;max-width:110px;"><label>Самочувствие (1–10)</label><input type="number" id="ciFeeling" min="1" max="10" placeholder="7"></div>
       </div>
+      <div class="form-row">
+        <div class="form-group" style="min-width:90px;max-width:110px;"><label>Талия (см)</label><input type="number" id="ciWaist" step="0.5" placeholder="95"></div>
+        <div class="form-group" style="min-width:90px;max-width:110px;"><label>Грудь (см)</label><input type="number" id="ciChest" step="0.5" placeholder="105"></div>
+        <div class="form-group" style="min-width:90px;max-width:110px;"><label>Бёдра (см)</label><input type="number" id="ciHips" step="0.5" placeholder="105"></div>
+        <div class="form-group" style="min-width:90px;max-width:110px;"><label>Шея (см)</label><input type="number" id="ciNeck" step="0.5" placeholder="40"></div>
+      </div>
       <div class="form-group"><label>Заметка</label><input type="text" id="ciNote" placeholder="Необязательно..."></div>
       <div><button class="btn btn-primary" onclick="saveCheckin()"><i class="ti ti-device-floppy" aria-hidden="true"></i> Сохранить</button></div>
     </div>
@@ -320,6 +326,11 @@
   <div class="card">
     <div class="card-title"><i class="ti ti-activity" aria-hidden="true"></i> Самочувствие</div>
     <div class="chart-wrap" style="padding:0.5rem;"><canvas id="feelingChart" height="120"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-ruler-measure" aria-hidden="true"></i> Замеры тела</div>
+    <div id="measurementsChart" style="margin-bottom:8px;"></div>
+    <div id="measurementsHistory"></div>
   </div>
   <div class="card">
     <div class="card-title"><i class="ti ti-run" aria-hidden="true"></i> Тест Купера (12-минутный бег)</div>
@@ -689,6 +700,7 @@ async function pushAllLocalData() {
     if (checkins.length) {
       const { error } = await sb.from('checkins').upsert(checkins.map(c => ({
         user_id: currentSession.user.id, date: c.date, weight: c.weight, sleep: c.sleep, feeling: c.feeling, note: c.note,
+        waist: c.waist||null, chest: c.chest||null, hips: c.hips||null, neck: c.neck||null,
       })));
       if (error) { console.error('Sync upload (checkins) failed:', error); errors.push('загрузка чек-инов: ' + error.message); }
     }
@@ -744,7 +756,7 @@ async function pullAllData() {
   }
   if (checkins) {
     localStorage.setItem('dailyCheckins', JSON.stringify(
-      checkins.map(c => ({ date: c.date, weight: c.weight, sleep: c.sleep, feeling: c.feeling, note: c.note }))
+      checkins.map(c => ({ date: c.date, weight: c.weight, sleep: c.sleep, feeling: c.feeling, note: c.note, waist: c.waist||null, chest: c.chest||null, hips: c.hips||null, neck: c.neck||null }))
         .sort((a, b) => b.date.localeCompare(a.date))
     ));
   }
@@ -786,6 +798,7 @@ async function pushCheckin(entry) {
   if (!currentSession) return;
   await sb.from('checkins').upsert({
     user_id: currentSession.user.id, date: entry.date, weight: entry.weight, sleep: entry.sleep, feeling: entry.feeling, note: entry.note,
+    waist: entry.waist||null, chest: entry.chest||null, hips: entry.hips||null, neck: entry.neck||null,
   });
 }
 async function pushDeleteCheckin(date) {
@@ -1395,11 +1408,15 @@ function saveCheckin() {
   const weight = parseFloat(document.getElementById('ciWeight').value)||null;
   const sleep = parseFloat(document.getElementById('ciSleep').value)||null;
   const feeling = parseInt(document.getElementById('ciFeeling').value)||null;
+  const waist = parseFloat(document.getElementById('ciWaist').value)||null;
+  const chest = parseFloat(document.getElementById('ciChest').value)||null;
+  const hips = parseFloat(document.getElementById('ciHips').value)||null;
+  const neck = parseFloat(document.getElementById('ciNeck').value)||null;
   const note = document.getElementById('ciNote').value.trim();
-  if (!date || (!weight && !sleep && !feeling)) { alert('Введите дату и хотя бы одно значение'); return; }
+  if (!date || (!weight && !sleep && !feeling && !waist && !chest && !hips && !neck)) { alert('Введите дату и хотя бы одно значение'); return; }
   const checkins = getCheckins();
   const existing = checkins.findIndex(c => c.date === date);
-  const entry = { date, weight, sleep, feeling, note };
+  const entry = { date, weight, sleep, feeling, waist, chest, hips, neck, note };
   if (existing >= 0) checkins[existing] = entry; else checkins.unshift(entry);
   checkins.sort((a,b) => b.date.localeCompare(a.date));
   localStorage.setItem('dailyCheckins', JSON.stringify(checkins));
@@ -1407,6 +1424,10 @@ function saveCheckin() {
   document.getElementById('ciWeight').value = '';
   document.getElementById('ciSleep').value = '';
   document.getElementById('ciFeeling').value = '';
+  document.getElementById('ciWaist').value = '';
+  document.getElementById('ciChest').value = '';
+  document.getElementById('ciHips').value = '';
+  document.getElementById('ciNeck').value = '';
   document.getElementById('ciNote').value = '';
   renderCheckinHistory();
   renderProgress();
@@ -1428,6 +1449,7 @@ function renderCheckinHistory() {
         <div>
           <div class="log-entry-date" style="font-size:13px;font-weight:500;">${c.date}</div>
           <div class="log-entry-date">${[c.weight?c.weight+' кг':null, c.sleep?'сон '+c.sleep+' ч':null, c.feeling?'самочувствие '+c.feeling+'/10':null].filter(Boolean).join(' · ')}</div>
+          ${(c.waist||c.chest||c.hips||c.neck)?`<div class="log-entry-date" style="margin-top:2px;">${[c.waist?'талия '+c.waist+' см':null,c.chest?'грудь '+c.chest+' см':null,c.hips?'бёдра '+c.hips+' см':null,c.neck?'шея '+c.neck+' см':null].filter(Boolean).join(' · ')}</div>`:''}
           ${c.note ? `<div class="log-entry-note">${c.note}</div>` : ''}
         </div>
         <button class="btn btn-danger" onclick="deleteCheckin('${c.date}')" style="font-size:12px;padding:4px 8px;"><i class="ti ti-trash" aria-hidden="true"></i></button>
@@ -1511,6 +1533,7 @@ function renderProgress() {
   const feelingData=Object.entries(feelingMap).sort((a,b)=>a[0].localeCompare(b[0])).map(([x,y])=>({x,y}));
   renderLineChart('weightChart',weightData,'Вес (кг)','#534AB7',85,110);
   renderLineChart('feelingChart',feelingData,'Самочувствие','#0F6E56',0,10);
+  renderMeasurements(checkins);
   const cooperData=JSON.parse(localStorage.getItem('cooperTests')||'{}');
   const cooperEl=document.getElementById('cooperTests');
   const vo2=d=>((d-504.9)/44.73).toFixed(1);
@@ -1537,6 +1560,46 @@ function renderProgress() {
   } else {
     srEl.innerHTML='<div style="font-size:13px;color:var(--text-3);">Нет записей</div>';
   }
+}
+function renderMeasurements(checkins) {
+  const el = document.getElementById('measurementsChart');
+  const histEl = document.getElementById('measurementsHistory');
+  if (!el || !histEl) return;
+  const fields = [
+    { key:'waist', label:'Талия', color:'#E07B39' },
+    { key:'chest', label:'Грудь', color:'#534AB7' },
+    { key:'hips',  label:'Бёдра', color:'#0F6E56' },
+    { key:'neck',  label:'Шея',   color:'#9B59B6' },
+  ];
+  const withData = checkins.filter(c => fields.some(f => c[f.key]));
+  if (!withData.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text-3);padding:4px 0;">Нет данных — добавьте замеры в форму выше.</div>';
+    histEl.innerHTML = '';
+    return;
+  }
+  // Mini inline charts per measurement type
+  el.innerHTML = fields.map(f => {
+    const pts = withData.filter(c => c[f.key]).map(c => ({ x: c.date, y: c[f.key] })).sort((a,b)=>a.x.localeCompare(b.x));
+    if (!pts.length) return '';
+    const first = pts[0].y, last = pts[pts.length-1].y;
+    const diff = (last - first).toFixed(1);
+    const sign = diff > 0 ? '+' : '';
+    const diffColor = f.key === 'waist' || f.key === 'hips' ? (diff < 0 ? 'var(--green-text)' : diff > 0 ? 'var(--red-text)' : 'var(--text-3)') : 'var(--text-3)';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border);">
+      <div style="font-size:13px;font-weight:500;min-width:60px;">${f.label}</div>
+      <div style="font-size:18px;font-weight:600;">${last} <span style="font-size:12px;font-weight:400;color:var(--text-2);">см</span></div>
+      <div style="font-size:12px;color:${diffColor};">${sign}${diff} от начала</div>
+    </div>`;
+  }).join('');
+  // History table
+  histEl.innerHTML = `<div style="font-size:12px;font-weight:500;color:var(--text-2);margin-top:12px;margin-bottom:6px;">${withData.length} записей</div>
+  <div class="exercise-table-wrap"><table class="exercise-table"><thead><tr>
+    <th>Дата</th><th>Талия</th><th>Грудь</th><th>Бёдра</th><th>Шея</th>
+  </tr></thead><tbody>` +
+  withData.slice(0,10).map(c => `<tr>
+    <td style="white-space:nowrap;">${c.date}</td>
+    <td>${c.waist||'—'}</td><td>${c.chest||'—'}</td><td>${c.hips||'—'}</td><td>${c.neck||'—'}</td>
+  </tr>`).join('') + '</tbody></table></div>';
 }
 function renderLineChart(canvasId,data,label,color,yMin,yMax) {
   const canvas=document.getElementById(canvasId);
