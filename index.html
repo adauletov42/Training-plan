@@ -188,14 +188,11 @@
   .hint-bar { font-size: 12px; color: var(--text-3); padding: 6px 10px; background: var(--bg); border-radius: var(--r-md); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
   .auth-bar { font-size: 12px; color: var(--text-2); padding: 8px 10px; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--r-md); margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
+  .exercise-table-wrap { overflow-x: scroll; -webkit-overflow-scrolling: touch; display: block; width: 100%; }
+  .exercise-table-wrap .exercise-table { min-width: 500px; width: max-content; }
   ::selection { background: var(--accent-bg); color: var(--accent-text); }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .metric-value, .exercise-table, .catchup-date, .cycle-lift input { font-variant-numeric: tabular-nums; }
-
-  .catchup-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid var(--border); }
-  .catchup-row:last-child { border-bottom: none; }
-  .catchup-date { flex: 1; font-size: 13px; color: var(--text-2); }
-  .catchup-empty { font-size: 13px; color: var(--text-3); }
+  .metric-value, .exercise-table, .cycle-lift input { font-variant-numeric: tabular-nums; }
 
   .cycle-lift { display: grid; grid-template-columns: 1fr repeat(3, 88px); gap: 10px; align-items: end; padding: 12px 0; border-bottom: 0.5px solid var(--border); }
   .cycle-lift:last-of-type { border-bottom: none; }
@@ -205,16 +202,6 @@
   .cycle-field span { font-size: 11px; color: var(--text-3); }
   .cycle-lift input { width: 100%; min-width: 0; padding: 7px 8px; font-size: 15px; background: var(--bg); color: var(--text); border: 0.5px solid var(--border); border-radius: var(--r-md); -moz-appearance: textfield; appearance: textfield; }
   .cycle-lift input::-webkit-outer-spin-button, .cycle-lift input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  @media (max-width: 600px) {
-    .cycle-lift { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .cycle-lift-head { grid-column: 1 / -1; }
-  }
-
-  .exercise-table-wrap { overflow-x: scroll; -webkit-overflow-scrolling: touch; display: block; width: 100%; }
-  .exercise-table-wrap .exercise-table { min-width: 500px; width: max-content; }
-  @media (max-width: 600px) {
-    .day-focus { display: none; }
-  }
 
   /* Пять вкладок не помещаются в один ряд на телефоне: суммарная ширина кнопок
      384px не сжимается ниже min-content, из-за чего страница уезжала вбок на
@@ -225,6 +212,12 @@
     nav button { min-width: 0; min-height: 44px; padding: 8px 4px; font-size: 12px; gap: 4px; }
     nav button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     nav button i { flex-shrink: 0; }
+    .cycle-lift { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cycle-lift-head { grid-column: 1 / -1; }
+  }
+
+  @media (max-width: 600px) {
+    .day-focus { display: none; }
   }
 </style>
 </head>
@@ -299,13 +292,6 @@
       <i class="ti ti-refresh" aria-hidden="true"></i> Сбросить неделю
     </button>
   </div>
-  <div class="card" style="margin-top:1rem;">
-    <div class="card-title">
-      <i class="ti ti-history-toggle" aria-hidden="true"></i> Догон пропущенных
-      <span class="week-badge" id="catchupCount" style="margin-left:auto;"></span>
-    </div>
-    <div id="catchupList"></div>
-  </div>
 </div>
 
 <!-- LOG -->
@@ -349,10 +335,20 @@
         <div class="form-group" style="min-width:80px;max-width:100px;"><label>Сон (ч)</label><input type="number" id="ciSleep" step="0.5" placeholder="7.5"></div>
         <div class="form-group" style="min-width:90px;max-width:110px;"><label>Самочувствие (1–10)</label><input type="number" id="ciFeeling" min="1" max="10" placeholder="7"></div>
       </div>
+      <div class="form-row">
+        <div class="form-group" style="min-width:90px;max-width:110px;"><label>Талия (см)</label><input type="number" id="ciWaist" step="0.5" placeholder="95"></div>
+        <div class="form-group" style="min-width:90px;max-width:110px;"><label>Грудь (см)</label><input type="number" id="ciChest" step="0.5" placeholder="105"></div>
+        <div class="form-group" style="min-width:90px;max-width:110px;"><label>Бёдра (см)</label><input type="number" id="ciHips" step="0.5" placeholder="105"></div>
+        <div class="form-group" style="min-width:90px;max-width:110px;"><label>Шея (см)</label><input type="number" id="ciNeck" step="0.5" placeholder="40"></div>
+      </div>
       <div class="form-group"><label>Заметка</label><input type="text" id="ciNote" placeholder="Необязательно..."></div>
       <div><button class="btn btn-primary" onclick="saveCheckin()"><i class="ti ti-device-floppy" aria-hidden="true"></i> Сохранить</button></div>
     </div>
     <div id="ciHistory" style="margin-top:1rem;"></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-chart-bar" aria-hidden="true"></i> Анализ тренировок</div>
+    <div id="workoutAnalysis"></div>
   </div>
   <div class="card">
     <div class="card-title"><i class="ti ti-weight" aria-hidden="true"></i> Вес тела</div>
@@ -363,11 +359,16 @@
     <div class="chart-wrap" style="padding:0.5rem;"><canvas id="feelingChart" height="120"></canvas></div>
   </div>
   <div class="card">
+    <div class="card-title"><i class="ti ti-ruler-measure" aria-hidden="true"></i> Замеры тела</div>
+    <div id="measurementsChart" style="margin-bottom:8px;"></div>
+    <div id="measurementsHistory"></div>
+  </div>
+  <div class="card">
     <div class="card-title"><i class="ti ti-run" aria-hidden="true"></i> Тест Купера (12-минутный бег)</div>
     <div id="cooperTests"></div>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
       <div class="form-group" style="min-width:100px;"><label>Неделя</label>
-        <select id="cooperWeek"></select>
+        <select id="cooperWeek"><option value="1">Неделя 1</option><option value="7">Неделя 7</option><option value="13">Неделя 13</option><option value="20">Неделя 20</option></select>
       </div>
       <div class="form-group" style="min-width:100px;"><label>Расстояние (м)</label><input type="number" id="cooperDist" placeholder="2000"></div>
       <div style="display:flex;align-items:flex-end;"><button class="btn" onclick="saveCooper()"><i class="ti ti-plus" aria-hidden="true"></i> Добавить</button></div>
@@ -571,14 +572,17 @@ const WORKOUTS = {
         { from:1, sets:'3×12', load:'30–35 кг' }, { from:3, sets:'4×10', load:'40–50 кг' }, { from:7, sets:'4×8', load:'55–70 кг' } ] },
       { name: 'Приседание со штангой (Low Bar)', rest:'90 сек', step:5, steps:[
         { from:1, sets:'3×10', load:'гриф 20 кг' }, { from:3, sets:'4×8', load:'55–70 кг' }, { from:7, sets:'4×6–8', load:'75–95 кг' } ] },
-      { name: 'Жим штанги на наклонной 30–45°', rest:'75 сек', step:2.5, steps:[
-        { from:1, sets:'3×10', load:'20–30 кг' }, { from:3, sets:'4×10', load:'45–55 кг' }, { from:7, sets:'4×8', load:'60–75 кг' } ] },
+      // Замена жима на время травмы плеча. В PRD такого упражнения нет, поэтому
+      // ступени ровно те, что были заданы при замене: промежуточная не выдумана.
+      { name: 'Горизонтальная тяга в тренажёре (сидя)', rest:'60 сек', step:2.5,
+        warn:'⚠️ Замена жима — щадит плечо. Вернуть жим после восстановления плеча', steps:[
+        { from:1, sets:'3×12', load:'30–40 кг' }, { from:7, sets:'4×10', load:'55–70 кг' } ] },
       { name: 'Тяга гантели одной рукой', rest:'60 сек', step:2.5, steps:[
         { from:1, sets:'3×12', load:'20–24 кг' }, { from:3, sets:'4×10', load:'26–32 кг' }, { from:7, sets:'4×8', load:'34–42 кг' } ] },
       { name: 'Планка классическая', rest:'45 сек', step:0, steps:[
         { from:1, sets:'3×', load:'20–25 сек' }, { from:3, sets:'3×', load:'40–50 сек' }, { from:7, sets:'3×', load:'60 сек' } ] },
     ],
-    finisher: 'Комплекс: махи гирей ×12 + бёрпи ×5\nНед.1–2: 3 раунда / гиря 16 кг / отдых 30 сек\nНед.3–6: 5 раундов / гиря 20 кг / отдых 30 сек\nНед.7+: 6–8 раундов / гиря 24 кг / отдых 20 сек\nЦелевой пульс: зона 4–5 (142–178 уд/мин)',
+    finisher: '⚠️ При боли в плече — заменить маховые гири на велотренажёр 5–8 мин интервалами (30 сек быстро / 30 сек медленно)\n\nСтандарт: Комплекс: махи гирей ×12 + бёрпи ×5\nНед.1–2: 3 раунда / гиря 16 кг / отдых 30 сек\nНед.3–6: 5 раундов / гиря 20 кг / отдых 30 сек\nНед.7+: 6–8 раундов / гиря 24 кг / отдых 20 сек\nЦелевой пульс: зона 4–5 (142–178 уд/мин)',
   },
   'Full Body Б': {
     warmup: 'Лёгкий бег или эллипс 8 мин (зона 2) + активация ягодиц, мобилизация голеностопа 2 мин',
@@ -589,10 +593,13 @@ const WORKOUTS = {
         { from:1, sets:'3×10/ногу', load:'собств. вес' }, { from:3, sets:'3×10/ногу', load:'гантели 12–20 кг' }, { from:7, sets:'4×8/ногу', load:'штанга 40–60 кг' } ] },
       { name: 'Тяга штанги в наклоне', rest:'75 сек', step:2.5, steps:[
         { from:1, sets:'3×12', load:'30–40 кг' }, { from:3, sets:'4×10', load:'45–60 кг' }, { from:7, sets:'4×8', load:'65–80 кг' } ] },
-      { name: 'Жим штанги стоя (OHP)', rest:'60 сек', step:2.5, steps:[
-        { from:1, sets:'3×10', load:'20–30 кг' }, { from:3, sets:'3×10', load:'35–45 кг' }, { from:7, sets:'4×8', load:'50–65 кг' } ] },
+      // Реабилитация ротаторной манжеты: нагрузка по самочувствию, а не по
+      // правилу прогрессии, поэтому step:0 — в форму весов цикла не попадает.
+      { name: 'Face pull (тяга к лицу)', rest:'45 сек', step:0,
+        warn:'⚠️ Замена OHP — восстановление ротаторной манжеты. Вернуть OHP после восстановления плеча', steps:[
+        { from:1, sets:'3×15–20', load:'канатная рукоять на уровне лица / 10–20 кг' } ] },
       { name: 'Ягодичный мост на одной ноге', rest:'45 сек', step:0, steps:[
-        { from:1, sets:'3×12/ногу', load:'собств. вес' }, { from:3, sets:'3×12/ногу', load:'собств. вес' }, { from:7, sets:'3×12/ногу', load:'собств. вес' } ] },
+        { from:1, sets:'3×12/ногу', load:'собств. вес' } ] },
     ],
     finisher: 'Комплекс: фермерская ходьба 30 м + приседание-прыжок ×8\nНед.1–2: 3 раунда / гантели 20 кг / отдых 30 сек\nНед.3–6: 4 раунда / гантели 24 кг / отдых 30 сек\nНед.7+: 5 раундов / гантели 28–32 кг / отдых 20 сек\nЦелевой пульс: зона 4 (142–160 уд/мин)',
   },
@@ -609,6 +616,13 @@ const WORKOUTS = {
       { name: 'Ходьба', dur: '20–30 мин', zone: 'Зона 1 (89–107 уд/мин)' },
       { name: 'Box breathing 4-4-4-4', dur: '5 мин', zone: 'Дыхательные упражнения' },
       { name: 'Стретчинг', dur: '10 мин', zone: 'Бёдра, пах, плечевой пояс' },
+    ],
+    shoulderBlocks: [
+      { name: 'Маятник Кодмана', sets: '2 × 30 сек', note: 'Наклон вперёд, расслабленная рука описывает круги — без напряжения' },
+      { name: 'Внешняя ротация с резинкой', sets: '3 × 15', note: 'Локоть прижат к боку, отводить кисть наружу. Лёгкое сопротивление' },
+      { name: 'Упражнение "W" с резинкой', sets: '3 × 12', note: 'Стоя, тянуть ленту вниз и назад — сводить лопатки' },
+      { name: 'Стретчинг пекторали у стены', sets: '3 × 30 сек', note: 'Рука на стене 90°, поворот корпуса от стены' },
+      { name: 'Пассивное растяжение плеча через грудь', sets: '2 × 30 сек / руку', note: 'Потянуть руку поперёк груди другой рукой' },
     ],
     kneeBlocks: [
       { name: 'Изометрическое напряжение квадрицепса', sets: '3 × 30 сек', note: 'Лёжа, прижать колено к полу' },
@@ -631,9 +645,9 @@ const WORKOUTS = {
 // ── Supabase (cloud sync) ────────────────────────────────────────────────
 const SUPABASE_URL = 'https://ufnityjbeaccwgxtjikl.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_bPBjH4MJ_az3UGTtozPuFg_DY31scCA';
-// CDN может быть недоступен (офлайн, блокировка, сбой jsdelivr). Приложение
-// работает локально и без него, поэтому клиент — необязательная зависимость:
-// при его отсутствии sb === null, а синхронизация честно выключается.
+// Клиент — необязательная зависимость: если supabase.js почему-то не
+// загрузился, приложение обязано продолжать работать локально, а не падать
+// на верхнем уровне скрипта и оставлять пустую страницу.
 const sb = (window.supabase && typeof window.supabase.createClient === 'function')
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
@@ -718,16 +732,15 @@ async function doSignOut() {
   closeAuthPanel();
 }
 
-if (sb) {
-  sb.auth.onAuthStateChange((event, session) => {
-    currentSession = session;
-    updateAuthBar();
-    refreshAuthPanelView();
-    if (event === 'SIGNED_IN') {
-      syncOnLogin();
-    }
-  });
-}
+if (sb) sb.auth.onAuthStateChange((event, session) => {
+  currentSession = session;
+  updateAuthBar();
+  refreshAuthPanelView();
+  if (event === 'SIGNED_IN') {
+    syncOnLogin();
+  }
+});
+
 
 async function syncOnLogin() {
   if (!sb) return { logsCount: 0, errors: [SYNC_UNAVAILABLE_MSG] };
@@ -783,6 +796,7 @@ async function pushAllLocalData() {
     if (checkins.length) {
       const { error } = await sb.from('checkins').upsert(checkins.map(c => ({
         user_id: currentSession.user.id, date: c.date, weight: c.weight, sleep: c.sleep, feeling: c.feeling, note: c.note,
+        waist: c.waist||null, chest: c.chest||null, hips: c.hips||null, neck: c.neck||null,
       })));
       if (error) { console.error('Sync upload (checkins) failed:', error); errors.push('загрузка чек-инов: ' + error.message); }
     }
@@ -847,7 +861,7 @@ async function pullAllData() {
   }
   if (checkins) {
     localStorage.setItem('dailyCheckins', JSON.stringify(
-      checkins.map(c => ({ date: c.date, weight: c.weight, sleep: c.sleep, feeling: c.feeling, note: c.note }))
+      checkins.map(c => ({ date: c.date, weight: c.weight, sleep: c.sleep, feeling: c.feeling, note: c.note, waist: c.waist||null, chest: c.chest||null, hips: c.hips||null, neck: c.neck||null }))
         .sort((a, b) => b.date.localeCompare(a.date))
     ));
   }
@@ -893,6 +907,7 @@ async function pushCheckin(entry) {
   if (!currentSession) return;
   await sb.from('checkins').upsert({
     user_id: currentSession.user.id, date: entry.date, weight: entry.weight, sleep: entry.sleep, feeling: entry.feeling, note: entry.note,
+    waist: entry.waist||null, chest: entry.chest||null, hips: entry.hips||null, neck: entry.neck||null,
   });
 }
 async function pushDeleteCheckin(date) {
@@ -911,13 +926,13 @@ async function pushSchedule(week, sched) {
   if (!currentSession) return;
   await sb.from('schedule_overrides').upsert({ user_id: currentSession.user.id, week, data: sched });
 }
+async function pushCycleWeights(cycle, data) {
+  if (!currentSession || !sb) return;
+  await sb.from('cycle_weights').upsert({ user_id: currentSession.user.id, cycle, data });
+}
 async function pushDeleteSchedule(week) {
   if (!currentSession) return;
   await sb.from('schedule_overrides').delete().eq('week', week);
-}
-async function pushCycleWeights(cycle, data) {
-  if (!currentSession) return;
-  await sb.from('cycle_weights').upsert({ user_id: currentSession.user.id, cycle, data });
 }
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -933,19 +948,9 @@ function localDateStr(d) {
   d = d || new Date();
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
-const CYCLE_LEN = 20;
-// Абсолютная неделя от старта программы, без ограничения сверху:
-// после недели 20 начинается следующий цикл с теми же фазами.
 function getWeek() {
   const diff = Math.floor((new Date() - mondayOfWeek1()) / (7*24*3600*1000)) + 1;
   return Math.max(1, diff);
-}
-function cycleOf(absWeek) { return Math.floor((absWeek - 1) / CYCLE_LEN) + 1; }
-function weekInCycle(absWeek) { return ((absWeek - 1) % CYCLE_LEN) + 1; }
-function cycleStartWeek(cycle) { return (cycle - 1) * CYCLE_LEN + 1; }
-function weekLabel(absWeek) {
-  const c = cycleOf(absWeek), w = weekInCycle(absWeek);
-  return c === 1 ? 'Неделя ' + w : 'Цикл ' + c + ' · неделя ' + w;
 }
 function getDateForDay(week, dayOfWeek) {
   const monday = mondayOfWeek1();
@@ -957,7 +962,7 @@ function getDateForDay(week, dayOfWeek) {
 function isDayLogged(dateStr) {
   return getLogs().some(l => l.date === dateStr);
 }
-function getPhase(absWeek) { const w = weekInCycle(absWeek); return w<=6?1:w<=14?2:3; }
+function getPhase(w) { const c=((w-1)%20)+1; return c<=6?1:c<=14?2:3; }
 function getPhaseDesc(w) {
   const p=getPhase(w);
   return p===1?'Фаза 1 — Адаптация: техника базовых упражнений, RPE 6–7, 3–4 раунда финишера':
@@ -973,7 +978,8 @@ function getWeekSchedule(week) {
     const saved = JSON.parse(localStorage.getItem(getOverrideKey(week)));
     if (saved && saved.length === 7) return saved;
   } catch {}
-  return DEFAULT_SCHEDULE.map(d => ({ ...d }));
+  const baseWeeks = Math.max(getWeek(), 20);
+  return week > baseWeeks ? getCatchupWeekSchedule(week) : DEFAULT_SCHEDULE.map(d => ({ ...d }));
 }
 
 function saveWeekSchedule(week, sched) {
@@ -1074,8 +1080,8 @@ function importMissedWorkouts() {
   saveCatchupQueue(q);
   renderSchedule();
   const notice = added > 0
-    ? `В список догона добавлено пропущенных тренировок: ${added}`
-    : 'Пропущенных тренировок не найдено — все выполнены или уже в списке догона';
+    ? `Добавлено ${added} пропущенных тренировок в дополнительные недели`
+    : 'Пропущенных тренировок не найдено — все выполнены или уже в очереди';
   showRescheduleNotice(notice, '');
 }
 
@@ -1085,55 +1091,42 @@ function getSourceWeek(dateStr) {
   return Math.max(1, Math.floor((d - mondayOfWeek1()) / (7*24*3600*1000)) + 1);
 }
 
-// Навигация по расписанию ограничена текущим циклом: назад — до первой недели
-// программы, вперёд — до конца цикла, в котором мы сейчас.
+function getCatchupGroups() {
+  const q = getCatchupQueue();
+  const groups = {};
+  for (const item of q) {
+    const wk = getSourceWeek(item.date);
+    if (!groups[wk]) groups[wk] = [];
+    groups[wk].push(item);
+  }
+  return Object.keys(groups).map(Number).sort((a, b) => a - b).map(wk => ({ sourceWeek: wk, items: groups[wk] }));
+}
+
 function getMaxWeek() {
-  return cycleOf(getWeek()) * CYCLE_LEN;
+  const groups = getCatchupGroups();
+  return Math.max(getWeek(), 20) + groups.length;
 }
 
-// Тот же формат даты, что в сетке недели: 22.06, а не 2026-06-22.
-function shortDate(dateStr) {
-  if (!dateStr) return '';
-  const m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return m ? `${m[3]}.${m[2]}` : dateStr;
-}
+function getCatchupWeekSchedule(week) {
+  const groups = getCatchupGroups();
+  const baseWeeks = Math.max(getWeek(), 20);
+  const group = groups[week - baseWeeks - 1];
+  if (!group) return DEFAULT_SCHEDULE.map(d => ({ ...d }));
 
-function removeFromCatchup(dateStr) {
-  const q = getCatchupQueue();
-  const i = q.findIndex(e => e.date === dateStr);
-  if (i === -1) return;
-  q.splice(i, 1);
-  saveCatchupQueue(q);
-  renderSchedule();
-}
-
-function renderCatchup() {
-  const el = document.getElementById('catchupList');
-  if (!el) return;
-  const q = getCatchupQueue();
-  const countEl = document.getElementById('catchupCount');
-  if (countEl) {
-    countEl.textContent = q.length ? String(q.length) : '';
-    countEl.style.display = q.length ? '' : 'none';
+  // Map each missed workout to its original day-of-week
+  const byDay = {};
+  for (const item of group.items) {
+    if (item.day !== undefined) byDay[item.day] = item;
   }
-  if (!q.length) {
-    el.innerHTML = '<div class="catchup-empty">Долгов нет. Пропущенные тренировки появятся здесь.</div>';
-    return;
-  }
-  el.innerHTML = q.map(item => {
-    const meta = TYPE_META[item.type] || {};
-    const badge = meta.badge || 'strength';
-    return `<div class="catchup-row">
-      <span class="day-badge badge-${badge}">${item.type}</span>
-      <span class="catchup-date">${shortDate(item.date)}${item.date ? ' · ' + weekLabel(getSourceWeek(item.date)).toLowerCase() : ''}</span>
-      <button class="icon-btn" title="Открыть программу" onclick="openWorkoutPanel('${item.type}','${item.name || ''}')">
-        <i class="ti ti-eye" aria-hidden="true"></i>
-      </button>
-      <button class="icon-btn" title="Убрать из догона" onclick="removeFromCatchup('${item.date}')">
-        <i class="ti ti-check" aria-hidden="true"></i>
-      </button>
-    </div>`;
-  }).join('');
+
+  return DEFAULT_SCHEDULE.map(d => {
+    const item = byDay[d.day];
+    if (item) {
+      const meta = TYPE_META[item.type] || {};
+      return { ...d, type: item.type, badge: meta.badge || 'strength', focus: meta.focus || '', dur: meta.dur || '', rescheduled: true };
+    }
+    return { ...d, type: 'Отдых', badge: 'rest', focus: 'Сон 8+ ч, прогулка', dur: '—', rescheduled: false };
+  });
 }
 
 function toggleSkip(idx) {
@@ -1159,7 +1152,7 @@ function toggleSkip(idx) {
       q.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
       saveCatchupQueue(q);
     }
-    showRescheduleNotice(workoutType, 'список догона');
+    showRescheduleNotice(workoutType, `дополнительная неделя ${getMaxWeek()}`);
   } else if (wasSkipped && sched[idx].skipped === false && !REST_TYPES.includes(workoutType)) {
     const q = getCatchupQueue();
     const i = q.findIndex(e => e.date === dateStr);
@@ -1184,8 +1177,16 @@ function showRescheduleNotice(type, when) {
 
 // ── Render schedule ────────────────────────────────────────────────────────
 function renderSchedule() {
-  document.getElementById('weekNavLabel').textContent = weekLabel(displayWeek);
-  renderCatchup();
+  const baseWeeks = Math.max(getWeek(), 20);
+  const isCatchup = displayWeek > baseWeeks;
+  if (isCatchup) {
+    const groups = getCatchupGroups();
+    const group = groups[displayWeek - baseWeeks - 1];
+    const srcLabel = group ? ` (пропуски нед. ${group.sourceWeek})` : '';
+    document.getElementById('weekNavLabel').textContent = `Доп. неделя ${displayWeek - baseWeeks}${srcLabel}`;
+  } else {
+    document.getElementById('weekNavLabel').textContent = 'Неделя ' + displayWeek;
+  }
   const today = new Date().getDay();
   const sched = getWeekSchedule(displayWeek);
   const grid = document.getElementById('weekGrid');
@@ -1249,143 +1250,34 @@ function changeWeek(dir) {
   renderSchedule();
 }
 
-// ── Cycle weights ──────────────────────────────────────────────────────────
-// Цикл 1 берёт веса из PRD. С цикла 2 веса задаёт атлет: приложение их не
-// выводит из дневника и не домножает таблицу PRD на коэффициент.
-function getAllCycleWeights() {
-  try { return JSON.parse(localStorage.getItem('cycleWeights') || '{}'); } catch { return {}; }
-}
-function getCycleWeights(cycle) { return getAllCycleWeights()[cycle] || null; }
-function saveCycleWeights(cycle, obj) {
-  const all = getAllCycleWeights();
-  all[cycle] = obj;
-  localStorage.setItem('cycleWeights', JSON.stringify(all));
-  pushCycleWeights(cycle, obj);
-}
-function cycleNeedsWeights(cycle) { return cycle > 1 && !getCycleWeights(cycle); }
-
-// Упражнения, для которых вес имеет смысл (планка и мост — нет).
-function cycleLifts() {
-  const out = [];
-  ['Full Body A', 'Full Body Б'].forEach(k => {
-    (WORKOUTS[k].exercises || []).forEach(ex => { if (ex.step) out.push(ex); });
-  });
-  return out;
-}
-
-function fmtKg(n) {
-  const v = Number(n);
-  return Number.isInteger(v) ? String(v) : v.toFixed(1).replace(/\.0$/, '');
-}
-
-// Шаг прогрессии из PRD §6.5: предложение, а не расчёт нагрузки.
-function suggestPhases(baseKg, step) {
-  const b = Number(baseKg);
-  if (!isFinite(b) || b <= 0) return ['', '', ''];
-  return [b, b + step * 2, b + step * 4].map(fmtKg);
-}
-
-// Ступень нагрузки по неделе внутри цикла. Пороги из PRD — 1, 3, 7 — и они
-// НЕ совпадают с границами фаз (1–6 / 7–14 / 15–20): это две разные шкалы.
-const STEP_LABELS = ['нед. 1–2', 'нед. 3–6', 'нед. 7+'];
-function stepIndex(ex, absWeek) {
-  const w = weekInCycle(absWeek);
-  const steps = ex.steps || [];
-  let idx = 0;
-  steps.forEach((s, i) => { if (s.from <= w) idx = i; });
-  return idx;
-}
-// Нагрузка упражнения на абсолютной неделе.
-function exerciseLoad(ex, absWeek) {
-  const i = stepIndex(ex, absWeek);
-  const base = (ex.steps || [])[i] || { sets: '', load: '' };
-  const cycle = cycleOf(absWeek);
-  if (cycle === 1 || !ex.step) return { sets: base.sets, load: base.load, pending: false, stepIdx: i };
-  const saved = getCycleWeights(cycle);
-  const kg = saved && saved[ex.name] ? saved[ex.name][i] : null;
-  if (kg === null || kg === undefined || kg === '') {
-    return { sets: base.sets, load: base.load, pending: true, stepIdx: i };
-  }
-  return { sets: base.sets, load: fmtKg(kg) + ' кг', pending: false, stepIdx: i };
-}
-
-function openCyclePanel(cycle) {
-  const saved = getCycleWeights(cycle) || {};
-  document.getElementById('cyclePanelTitle').textContent = 'Рабочие веса · цикл ' + cycle;
-  const panel = document.getElementById('cyclePanel');
-  panel.dataset.cycle = String(cycle);
-  document.getElementById('cycleLifts').innerHTML = cycleLifts().map((ex, i) => {
-    const vals = saved[ex.name] || ['', '', ''];
-    const prd = ex.steps.map(s => s.load).join(' · ');
-    const field = (k, extra) => `<label class="cycle-field" for="cw-${i}-${k}">
-      <span>Нед. ${['1–2','3–6','7+'][k]}</span>
-      <input type="number" step="0.5" inputmode="decimal" id="cw-${i}-${k}" value="${vals[k] ?? ''}"${extra}>
-    </label>`;
-    return `<div class="cycle-lift">
-      <div class="cycle-lift-head">
-        <div class="cycle-lift-name">${ex.name}</div>
-        <div class="cycle-lift-prd">цикл 1: ${prd} · шаг ${fmtKg(ex.step)} кг</div>
-      </div>
-      ${field(0, ` oninput="prefillCycleRow(${i}, ${ex.step})"`)}${field(1, '')}${field(2, '')}
-    </div>`;
-  }).join('');
-  panel.classList.add('open');
-}
-// Фазы 2–3 заполняются только пока атлет их не трогал: правка не затирается.
-function prefillCycleRow(i, step) {
-  const base = document.getElementById('cw-' + i + '-0').value;
-  const s = suggestPhases(base, step);
-  [1, 2].forEach(k => {
-    const el = document.getElementById('cw-' + i + '-' + k);
-    if (!el.dataset.touched) el.value = s[k];
-    el.onchange = () => { el.dataset.touched = '1'; };
-  });
-}
-function saveCyclePanel() {
-  const cycle = Number(document.getElementById('cyclePanel').dataset.cycle);
-  const obj = {};
-  cycleLifts().forEach((ex, i) => {
-    const vals = [0, 1, 2].map(k => document.getElementById('cw-' + i + '-' + k).value.trim());
-    if (vals.some(v => v !== '')) obj[ex.name] = vals;
-  });
-  if (!Object.keys(obj).length) {
-    alert('Не заполнено ни одного веса. Введите хотя бы недели 1–2 одного упражнения.');
-    return;
-  }
-  saveCycleWeights(cycle, obj);
-  closeCyclePanel();
-  renderDashboard();
-}
-function closeCyclePanel() { document.getElementById('cyclePanel').classList.remove('open'); }
-function closeCyclePanelBg(e) { if (e.target === document.getElementById('cyclePanel')) closeCyclePanel(); }
-
 // ── Dashboard ──────────────────────────────────────────────────────────────
 function renderDashboard() {
   const week = getWeek();
   displayWeek = week;
-  const cycle = cycleOf(week), wic = weekInCycle(week);
-  document.getElementById('currentWeekBadge').textContent = weekLabel(week);
+  const cycle = cycleOf(week);
+  document.getElementById('currentWeekBadge').textContent = 'Неделя ' + week;
 
   const banner = document.getElementById('cycleBanner');
-  if (cycleNeedsWeights(cycle)) {
-    banner.innerHTML = `<div class="card">
-      <div class="card-title"><i class="ti ti-barbell" aria-hidden="true"></i> Цикл ${cycle} начался</div>
-      <div style="font-size:14px;margin-bottom:12px;">Фазы пошли заново. Пока веса цикла не заданы, программа показывает веса цикла 1 — задайте свои рабочие веса.</div>
-      <button class="btn btn-primary" onclick="openCyclePanel(${cycle})"><i class="ti ti-pencil" aria-hidden="true"></i> Задать веса цикла ${cycle}</button>
-    </div>`;
-  } else if (cycle > 1) {
-    banner.innerHTML = `<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <div style="flex:1;min-width:180px;font-size:14px;">Веса цикла ${cycle} заданы.</div>
-      <button class="btn" onclick="openCyclePanel(${cycle})" style="font-size:13px;"><i class="ti ti-pencil" aria-hidden="true"></i> Изменить</button>
-    </div>`;
-  } else {
-    banner.innerHTML = '';
+  if (banner) {
+    if (cycleNeedsWeights(cycle)) {
+      banner.innerHTML = `<div class="card">
+        <div class="card-title"><i class="ti ti-barbell" aria-hidden="true"></i> Цикл ${cycle}: веса не заданы</div>
+        <div style="font-size:14px;margin-bottom:12px;">Фазы пошли по ${cycle}-му кругу, а программа показывает веса первого цикла. Задайте свои рабочие веса.</div>
+        <button class="btn btn-primary" onclick="openCyclePanel(${cycle})"><i class="ti ti-pencil" aria-hidden="true"></i> Задать веса цикла ${cycle}</button>
+      </div>`;
+    } else if (cycle > 1) {
+      banner.innerHTML = `<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:180px;font-size:14px;">Веса цикла ${cycle} заданы.</div>
+        <button class="btn" onclick="openCyclePanel(${cycle})" style="font-size:13px;"><i class="ti ti-pencil" aria-hidden="true"></i> Изменить</button>
+      </div>`;
+    } else {
+      banner.innerHTML = '';
+    }
   }
-
   const lastLog = getLastLog();
   const lastWeight = lastLog ? lastLog.bodyWeight : null;
   const metrics = [
-    { label:'Текущая неделя', value:wic+' / 20', sub:cycle===1?'цикл 1':'цикл '+cycle },
+    { label:'Текущая неделя', value:'Неделя ' + week, sub: week <= 20 ? 'из 20 недель плана' : 'продолжение' },
     { label:'Вес тела', value:(lastWeight||'–')+(lastWeight?' кг':''), sub:lastWeight?'последняя запись':'нет данных' },
     { label:'Фаза', value:'Фаза '+getPhase(week), sub:['Адаптация','Развитие','Пик'][getPhase(week)-1] },
     { label:'Дефицит веса', value:lastWeight?(lastWeight-90).toFixed(1)+' кг':'–', sub:'до цели 90 кг' },
@@ -1424,15 +1316,124 @@ function renderDashboard() {
   }
 
   const strip = document.getElementById('phaseStrip');
-  strip.innerHTML = Array.from({length:CYCLE_LEN},(_,i)=>{
-    const abs=cycleStartWeek(cycle)+i;
-    const cl=getPhase(abs)===1?'p1':getPhase(abs)===2?'p2':'p3';
-    return `<div class="phase-block ${cl}${abs===week?' current':''}" title="${weekLabel(abs)}"></div>`;
+  strip.innerHTML = Array.from({length:20},(_,i)=>{
+    const w=i+1;
+    const cl=getPhase(w)===1?'p1':getPhase(w)===2?'p2':'p3';
+    return `<div class="phase-block ${cl}${w===week?' current':''}" title="Неделя ${w}"></div>`;
   }).join('');
   document.getElementById('phaseDesc').textContent = getPhaseDesc(week);
 }
 
 // ── Workout panel ──────────────────────────────────────────────────────────
+// Две разные шкалы, которые легко перепутать: фазы идут неделями 1–6 / 7–14 /
+// 15–20 цикла (PRD §5), а ступени весов — неделями 1–2 / 3–6 / 7+ (столбцы
+// таблиц PRD §6.1 и §6.2). Границы не совпадают.
+const CYCLE_LEN = 20;
+const STEP_LABELS = ['нед. 1–2', 'нед. 3–6', 'нед. 7+'];
+function cycleOf(absWeek) { return Math.floor((absWeek - 1) / CYCLE_LEN) + 1; }
+function weekInCycle(absWeek) { return ((absWeek - 1) % CYCLE_LEN) + 1; }
+
+function stepIndex(ex, absWeek) {
+  const w = weekInCycle(absWeek);
+  let idx = 0;
+  (ex.steps || []).forEach((s, i) => { if (s.from <= w) idx = i; });
+  return idx;
+}
+
+function getAllCycleWeights() {
+  try { return JSON.parse(localStorage.getItem('cycleWeights') || '{}'); } catch { return {}; }
+}
+function getCycleWeights(cycle) { return getAllCycleWeights()[cycle] || null; }
+function saveCycleWeights(cycle, obj) {
+  const all = getAllCycleWeights();
+  all[cycle] = obj;
+  localStorage.setItem('cycleWeights', JSON.stringify(all));
+  pushCycleWeights(cycle, obj);
+}
+function cycleNeedsWeights(cycle) { return cycle > 1 && !getCycleWeights(cycle); }
+
+function cycleLifts() {
+  const out = [];
+  ['Full Body A', 'Full Body Б'].forEach(k => {
+    (WORKOUTS[k].exercises || []).forEach(ex => { if (ex.step) out.push(ex); });
+  });
+  return out;
+}
+
+function fmtKg(n) {
+  const v = Number(n);
+  return Number.isInteger(v) ? String(v) : v.toFixed(1).replace(/\.0$/, '');
+}
+
+// Подсказка по правилу прогрессии PRD §6.5, а не расчёт нагрузки.
+function suggestSteps(baseKg, step) {
+  const b = Number(baseKg);
+  if (!isFinite(b) || b <= 0) return ['', '', ''];
+  return [b, b + step * 2, b + step * 4].map(fmtKg);
+}
+
+// Нагрузка упражнения на абсолютной неделе. С цикла 2 веса задаёт атлет:
+// приложение не выводит их из дневника и не домножает таблицу PRD.
+function exerciseLoad(ex, absWeek) {
+  const i = stepIndex(ex, absWeek);
+  const base = (ex.steps || [])[i] || { sets: '', load: '' };
+  const cycle = cycleOf(absWeek);
+  if (cycle === 1 || !ex.step) return { sets: base.sets, load: base.load, pending: false };
+  const saved = getCycleWeights(cycle);
+  const kg = saved && saved[ex.name] ? saved[ex.name][i] : null;
+  if (kg === null || kg === undefined || kg === '') return { sets: base.sets, load: base.load, pending: true };
+  return { sets: base.sets, load: fmtKg(kg) + ' кг', pending: false };
+}
+
+function openCyclePanel(cycle) {
+  const saved = getCycleWeights(cycle) || {};
+  document.getElementById('cyclePanelTitle').textContent = 'Рабочие веса · цикл ' + cycle;
+  const panel = document.getElementById('cyclePanel');
+  panel.dataset.cycle = String(cycle);
+  document.getElementById('cycleLifts').innerHTML = cycleLifts().map((ex, i) => {
+    const vals = saved[ex.name] || ['', '', ''];
+    const prd = ex.steps.map(s => s.load).join(' · ');
+    const field = (k, extra) => `<label class="cycle-field" for="cw-${i}-${k}">
+      <span>Нед. ${['1–2','3–6','7+'][k]}</span>
+      <input type="number" step="0.5" inputmode="decimal" id="cw-${i}-${k}" value="${vals[k] ?? ''}"${extra}>
+    </label>`;
+    return `<div class="cycle-lift">
+      <div class="cycle-lift-head">
+        <div class="cycle-lift-name">${ex.name}</div>
+        <div class="cycle-lift-prd">цикл 1: ${prd} · шаг ${fmtKg(ex.step)} кг</div>
+      </div>
+      ${field(0, ` oninput="prefillCycleRow(${i}, ${ex.step})"`)}${field(1, '')}${field(2, '')}
+    </div>`;
+  }).join('');
+  panel.classList.add('open');
+}
+// Ступени 2–3 заполняются, только пока атлет их не трогал: правка не затирается.
+function prefillCycleRow(i, step) {
+  const s = suggestSteps(document.getElementById('cw-' + i + '-0').value, step);
+  [1, 2].forEach(k => {
+    const el = document.getElementById('cw-' + i + '-' + k);
+    if (!el.dataset.touched) el.value = s[k];
+    el.onchange = () => { el.dataset.touched = '1'; };
+  });
+}
+function saveCyclePanel() {
+  const cycle = Number(document.getElementById('cyclePanel').dataset.cycle);
+  const obj = {};
+  cycleLifts().forEach((ex, i) => {
+    const vals = [0, 1, 2].map(k => document.getElementById('cw-' + i + '-' + k).value.trim());
+    if (vals.some(v => v !== '')) obj[ex.name] = vals;
+  });
+  if (!Object.keys(obj).length) {
+    alert('Не заполнено ни одного веса. Введите хотя бы недели 1–2 одного упражнения.');
+    return;
+  }
+  saveCycleWeights(cycle, obj);
+  closeCyclePanel();
+  renderDashboard();
+}
+function closeCyclePanel() { document.getElementById('cyclePanel').classList.remove('open'); }
+function closeCyclePanelBg(e) { if (e.target === document.getElementById('cyclePanel')) closeCyclePanel(); }
+
 function openWorkoutPanel(type, dayName) {
   const panel = document.getElementById('workoutPanel');
   panel.currentType = type;
@@ -1446,22 +1447,22 @@ function openWorkoutPanel(type, dayName) {
       <div style="font-size:12px;font-weight:500;color:var(--teal-text);margin-bottom:3px;">Разминка (10 мин)</div>
       <div style="font-size:13px;color:var(--teal-text);">${w.warmup}</div></div>
     <div class="exercise-table-wrap"><table class="exercise-table"><thead><tr>
-      <th>Упражнение</th><th>Сейчас · ${STEP_LABELS[stepIndex(w.exercises[0], getWeek())]}</th><th>Ступени: 1–2 · 3–6 · 7+</th><th>Отдых</th>
+      <th>Упражнение</th><th>Сейчас · ${STEP_LABELS[stepIndex(w.exercises[0], getWeek())]}</th><th>Ступени</th><th>Отдых</th>
     </tr></thead><tbody>`;
     const week = getWeek();
     const cyc = cycleOf(week);
     w.exercises.forEach(ex => {
       const cur = exerciseLoad(ex, week);
+      const saved = cyc > 1 ? getCycleWeights(cyc) : null;
       const steps = (ex.steps || []).map((s, i) => {
         let load = s.load;
-        if (cyc > 1 && ex.step) {
-          const saved = getCycleWeights(cyc);
-          const kg = saved && saved[ex.name] ? saved[ex.name][i] : null;
+        if (ex.step && saved && saved[ex.name]) {
+          const kg = saved[ex.name][i];
           if (kg !== null && kg !== undefined && kg !== '') load = fmtKg(kg) + ' кг';
         }
         return `${s.sets} ${load}`;
       }).join(' · ');
-      html += `<tr><td><div class="exercise-name">${ex.name}</div></td>
+      html += `<tr><td><div class="exercise-name">${ex.name}</div>${ex.warn ? '<div class="exercise-note" style="margin-top:2px;">'+ex.warn+'</div>' : ''}</td>
         <td style="white-space:nowrap;"><strong>${cur.sets} ${cur.load}</strong>${cur.pending ? '<div class="exercise-note" style="margin-top:2px;">веса цикла '+cyc+' не заданы</div>' : ''}</td>
         <td><div class="exercise-note">${steps}</div></td><td style="white-space:nowrap;">${ex.rest}</td></tr>`;
     });
@@ -1493,6 +1494,19 @@ function openWorkoutPanel(type, dayName) {
       });
       html += `</tbody></table></div></div>`;
     }
+    if (w.shoulderBlocks) {
+      html += `<div style="margin-top:16px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">💪 Восстановление плеча</div>
+        <div class="exercise-table-wrap"><table class="exercise-table"><thead><tr>
+          <th>Упражнение</th><th>Подходы × Повт.</th><th>Комментарий</th>
+        </tr></thead><tbody>`;
+      w.shoulderBlocks.forEach(b => {
+        html += `<tr><td><div class="exercise-name">${b.name}</div></td>
+          <td style="white-space:nowrap;">${b.sets}</td>
+          <td><div class="exercise-note">${b.note}</div></td></tr>`;
+      });
+      html += `</tbody></table></div></div>`;
+    }
   }
   document.getElementById('panelContent').innerHTML = html;
   panel.classList.add('open');
@@ -1512,6 +1526,10 @@ function goToLog() {
 function getSetsExercises(type) {
   if (type==='Full Body A') return WORKOUTS['Full Body A'].exercises.map(e=>e.name);
   if (type==='Full Body B') return WORKOUTS['Full Body Б'].exercises.map(e=>e.name);
+  if (type==='Recovery') return [
+    ...WORKOUTS['Восстановление'].shoulderBlocks.map(b=>b.name),
+    ...WORKOUTS['Восстановление'].kneeBlocks.map(b=>b.name),
+  ];
   return [];
 }
 function updateSetsSection() {
@@ -1644,11 +1662,15 @@ function saveCheckin() {
   const weight = parseFloat(document.getElementById('ciWeight').value)||null;
   const sleep = parseFloat(document.getElementById('ciSleep').value)||null;
   const feeling = parseInt(document.getElementById('ciFeeling').value)||null;
+  const waist = parseFloat(document.getElementById('ciWaist').value)||null;
+  const chest = parseFloat(document.getElementById('ciChest').value)||null;
+  const hips = parseFloat(document.getElementById('ciHips').value)||null;
+  const neck = parseFloat(document.getElementById('ciNeck').value)||null;
   const note = document.getElementById('ciNote').value.trim();
-  if (!date || (!weight && !sleep && !feeling)) { alert('Введите дату и хотя бы одно значение'); return; }
+  if (!date || (!weight && !sleep && !feeling && !waist && !chest && !hips && !neck)) { alert('Введите дату и хотя бы одно значение'); return; }
   const checkins = getCheckins();
   const existing = checkins.findIndex(c => c.date === date);
-  const entry = { date, weight, sleep, feeling, note };
+  const entry = { date, weight, sleep, feeling, waist, chest, hips, neck, note };
   if (existing >= 0) checkins[existing] = entry; else checkins.unshift(entry);
   checkins.sort((a,b) => b.date.localeCompare(a.date));
   localStorage.setItem('dailyCheckins', JSON.stringify(checkins));
@@ -1656,6 +1678,10 @@ function saveCheckin() {
   document.getElementById('ciWeight').value = '';
   document.getElementById('ciSleep').value = '';
   document.getElementById('ciFeeling').value = '';
+  document.getElementById('ciWaist').value = '';
+  document.getElementById('ciChest').value = '';
+  document.getElementById('ciHips').value = '';
+  document.getElementById('ciNeck').value = '';
   document.getElementById('ciNote').value = '';
   renderCheckinHistory();
   renderProgress();
@@ -1677,6 +1703,7 @@ function renderCheckinHistory() {
         <div>
           <div class="log-entry-date" style="font-size:13px;font-weight:500;">${c.date}</div>
           <div class="log-entry-date">${[c.weight?c.weight+' кг':null, c.sleep?'сон '+c.sleep+' ч':null, c.feeling?'самочувствие '+c.feeling+'/10':null].filter(Boolean).join(' · ')}</div>
+          ${(c.waist||c.chest||c.hips||c.neck)?`<div class="log-entry-date" style="margin-top:2px;">${[c.waist?'талия '+c.waist+' см':null,c.chest?'грудь '+c.chest+' см':null,c.hips?'бёдра '+c.hips+' см':null,c.neck?'шея '+c.neck+' см':null].filter(Boolean).join(' · ')}</div>`:''}
           ${c.note ? `<div class="log-entry-note">${c.note}</div>` : ''}
         </div>
         <button class="btn btn-danger" onclick="deleteCheckin('${c.date}')" style="font-size:12px;padding:4px 8px;"><i class="ti ti-trash" aria-hidden="true"></i></button>
@@ -1746,22 +1773,7 @@ function saveStrength() {
   document.getElementById('strengthKg').value='';
   renderProgress();
 }
-// Недели теста Купера из PRD (1, 7, 13, 20) внутри текущего цикла, но ключ
-// хранения — абсолютная неделя, иначе цикл 2 затёр бы результаты цикла 1.
-function renderCooperWeekOptions() {
-  const sel = document.getElementById('cooperWeek');
-  if (!sel) return;
-  const cycle = cycleOf(getWeek());
-  if (sel.dataset.cycle === String(cycle) && sel.options.length) return;
-  sel.dataset.cycle = String(cycle);
-  const start = cycleStartWeek(cycle);
-  sel.innerHTML = [1, 7, 13, 20]
-    .map(w => { const abs = start + w - 1; return `<option value="${abs}">${weekLabel(abs)}</option>`; })
-    .join('');
-}
-
 function renderProgress() {
-  renderCooperWeekOptions();
   const logs=getLogs();
   const checkins=getCheckins();
   // merge workout logs + daily checkins for charts, deduplicate by date (checkin wins)
@@ -1773,14 +1785,16 @@ function renderProgress() {
   logs.filter(l=>l.feeling).forEach(l=>{ if(!feelingMap[l.date]) feelingMap[l.date]=l.feeling; });
   checkins.filter(c=>c.feeling).forEach(c=>{ feelingMap[c.date]=c.feeling; });
   const feelingData=Object.entries(feelingMap).sort((a,b)=>a[0].localeCompare(b[0])).map(([x,y])=>({x,y}));
+  renderWorkoutAnalysis(logs, checkins);
   renderLineChart('weightChart',weightData,'Вес (кг)','#534AB7',85,110);
   renderLineChart('feelingChart',feelingData,'Самочувствие','#0F6E56',0,10);
+  renderMeasurements(checkins);
   const cooperData=JSON.parse(localStorage.getItem('cooperTests')||'{}');
   const cooperEl=document.getElementById('cooperTests');
   const vo2=d=>((d-504.9)/44.73).toFixed(1);
   if (Object.keys(cooperData).length) {
     cooperEl.innerHTML=Object.entries(cooperData).sort((a,b)=>+a[0]-+b[0]).map(([w,d])=>
-      `<div class="test-entry"><div class="test-entry-week">${weekLabel(+w)}</div>
+      `<div class="test-entry"><div class="test-entry-week">Неделя ${w}</div>
       <div><div class="test-entry-value">${d} м</div><div class="test-entry-vo2">~${vo2(d)} мл/кг/мин VO₂max</div></div></div>`
     ).join('');
   } else {
@@ -1801,6 +1815,142 @@ function renderProgress() {
   } else {
     srEl.innerHTML='<div style="font-size:13px;color:var(--text-3);">Нет записей</div>';
   }
+}
+function renderWorkoutAnalysis(logs, checkins) {
+  const el = document.getElementById('workoutAnalysis');
+  if (!el) return;
+  if (!logs.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text-3);padding:4px 0;">Нет данных — начните записывать тренировки.</div>';
+    return;
+  }
+
+  // ── Totals ──
+  const total = logs.length;
+  const currentWeek = getWeek();
+  const plannedWorkouts = currentWeek * 4; // ~4 тренировки в неделю (пн,вт,чт,пт)
+  const completionPct = Math.min(100, Math.round(total / plannedWorkouts * 100));
+
+  // ── Streak ──
+  const logDates = new Set(logs.map(l => l.date));
+  let streak = 0;
+  const today = localDateStr();
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    if (logDates.has(localDateStr(d))) streak++; else if (i > 0) break;
+  }
+
+  // ── By type ──
+  const typeMap = { 'Full Body A':'Full Body A','Full Body B':'Full Body Б','BJJ':'БЖЖ','Recovery':'Восстановление' };
+  const byType = {};
+  logs.forEach(l => { const t = typeMap[l.type]||l.type; byType[t] = (byType[t]||0)+1; });
+
+  // ── Weekly volume (last 8 weeks) ──
+  const weeklyCount = {};
+  logs.forEach(l => {
+    const d = new Date(l.date + 'T12:00:00');
+    const wk = Math.max(1, Math.floor((d - mondayOfWeek1()) / (7*24*3600*1000)) + 1);
+    weeklyCount[wk] = (weeklyCount[wk]||0) + 1;
+  });
+  const recentWeeks = Array.from({length:8}, (_,i) => currentWeek - 7 + i).filter(w=>w>=1);
+  const maxWC = Math.max(1, ...recentWeeks.map(w=>weeklyCount[w]||0));
+
+  // ── Averages ──
+  const avgSleep = logs.filter(l=>l.sleep).reduce((s,l)=>s+l.sleep,0) / (logs.filter(l=>l.sleep).length||1);
+  const avgFeeling = logs.filter(l=>l.feeling).reduce((s,l)=>s+l.feeling,0) / (logs.filter(l=>l.feeling).length||1);
+
+  // ── This week vs last week ──
+  const thisWeekCount = weeklyCount[currentWeek]||0;
+  const lastWeekCount = weeklyCount[currentWeek-1]||0;
+  const weekTrend = thisWeekCount - lastWeekCount;
+
+  el.innerHTML = `
+    <div class="metrics" style="margin-bottom:16px;">
+      <div class="metric"><div class="metric-label">Всего тренировок</div><div class="metric-value">${total}</div><div class="metric-sub">за всё время</div></div>
+      <div class="metric"><div class="metric-label">Выполнение плана</div><div class="metric-value">${completionPct}%</div><div class="metric-sub">${total} из ~${plannedWorkouts}</div></div>
+      <div class="metric"><div class="metric-label">Серия подряд</div><div class="metric-value">${streak}</div><div class="metric-sub">${streak===1?'день':'дней'}</div></div>
+      <div class="metric"><div class="metric-label">Эта неделя</div><div class="metric-value">${thisWeekCount}</div><div class="metric-sub" style="color:${weekTrend>0?'var(--green-text)':weekTrend<0?'var(--red-text)':'var(--text-3)'};">${weekTrend>0?'↑'+weekTrend+' vs пред.':weekTrend<0?'↓'+Math.abs(weekTrend)+' vs пред.':'= пред. неделя'}</div></div>
+    </div>
+
+    <div style="font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">По типам</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
+      ${Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([t,n])=>`
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:13px;min-width:120px;">${t}</div>
+          <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;">
+            <div style="height:100%;width:${Math.round(n/total*100)}%;background:var(--accent);border-radius:4px;"></div>
+          </div>
+          <div style="font-size:13px;font-weight:500;min-width:32px;text-align:right;">${n}</div>
+        </div>`).join('')}
+    </div>
+
+    <div style="font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Нагрузка по неделям (последние 8)</div>
+    <div style="display:flex;align-items:flex-end;gap:6px;height:60px;margin-bottom:4px;">
+      ${recentWeeks.map(w=>{
+        const cnt = weeklyCount[w]||0;
+        const h = Math.round(cnt/maxWC*100);
+        const isCur = w===currentWeek;
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;">
+          <div style="font-size:10px;color:var(--text-3);">${cnt||''}</div>
+          <div style="width:100%;height:${Math.max(4,h)}%;background:${isCur?'var(--accent)':'var(--accent-bg)'};border-radius:3px 3px 0 0;min-height:4px;"></div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="display:flex;gap:6px;">
+      ${recentWeeks.map(w=>`<div style="flex:1;text-align:center;font-size:10px;color:var(--text-3);">Н${w}</div>`).join('')}
+    </div>
+
+    ${(logs.filter(l=>l.sleep).length || logs.filter(l=>l.feeling).length) ? `
+    <div style="display:flex;gap:12px;margin-top:16px;">
+      ${logs.filter(l=>l.sleep).length?`<div style="flex:1;padding:10px;background:var(--accent-bg);border-radius:var(--r-md);text-align:center;">
+        <div style="font-size:18px;font-weight:600;color:var(--accent-text);">${avgSleep.toFixed(1)} ч</div>
+        <div style="font-size:12px;color:var(--text-2);">средний сон</div>
+      </div>`:''}
+      ${logs.filter(l=>l.feeling).length?`<div style="flex:1;padding:10px;background:var(--green-bg);border-radius:var(--r-md);text-align:center;">
+        <div style="font-size:18px;font-weight:600;color:var(--green-text);">${avgFeeling.toFixed(1)}/10</div>
+        <div style="font-size:12px;color:var(--text-2);">среднее самочувствие</div>
+      </div>`:''}
+    </div>` : ''}
+  `;
+}
+function renderMeasurements(checkins) {
+  const el = document.getElementById('measurementsChart');
+  const histEl = document.getElementById('measurementsHistory');
+  if (!el || !histEl) return;
+  const fields = [
+    { key:'waist', label:'Талия', color:'#E07B39' },
+    { key:'chest', label:'Грудь', color:'#534AB7' },
+    { key:'hips',  label:'Бёдра', color:'#0F6E56' },
+    { key:'neck',  label:'Шея',   color:'#9B59B6' },
+  ];
+  const withData = checkins.filter(c => fields.some(f => c[f.key]));
+  if (!withData.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text-3);padding:4px 0;">Нет данных — добавьте замеры в форму выше.</div>';
+    histEl.innerHTML = '';
+    return;
+  }
+  // Mini inline charts per measurement type
+  el.innerHTML = fields.map(f => {
+    const pts = withData.filter(c => c[f.key]).map(c => ({ x: c.date, y: c[f.key] })).sort((a,b)=>a.x.localeCompare(b.x));
+    if (!pts.length) return '';
+    const first = pts[0].y, last = pts[pts.length-1].y;
+    const diff = (last - first).toFixed(1);
+    const sign = diff > 0 ? '+' : '';
+    const diffColor = f.key === 'waist' || f.key === 'hips' ? (diff < 0 ? 'var(--green-text)' : diff > 0 ? 'var(--red-text)' : 'var(--text-3)') : 'var(--text-3)';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border);">
+      <div style="font-size:13px;font-weight:500;min-width:60px;">${f.label}</div>
+      <div style="font-size:18px;font-weight:600;">${last} <span style="font-size:12px;font-weight:400;color:var(--text-2);">см</span></div>
+      <div style="font-size:12px;color:${diffColor};">${sign}${diff} от начала</div>
+    </div>`;
+  }).join('');
+  // History table
+  histEl.innerHTML = `<div style="font-size:12px;font-weight:500;color:var(--text-2);margin-top:12px;margin-bottom:6px;">${withData.length} записей</div>
+  <div class="exercise-table-wrap"><table class="exercise-table"><thead><tr>
+    <th>Дата</th><th>Талия</th><th>Грудь</th><th>Бёдра</th><th>Шея</th>
+  </tr></thead><tbody>` +
+  withData.slice(0,10).map(c => `<tr>
+    <td style="white-space:nowrap;">${c.date}</td>
+    <td>${c.waist||'—'}</td><td>${c.chest||'—'}</td><td>${c.hips||'—'}</td><td>${c.neck||'—'}</td>
+  </tr>`).join('') + '</tbody></table></div>';
 }
 function renderLineChart(canvasId,data,label,color,yMin,yMax) {
   const canvas=document.getElementById(canvasId);
@@ -1874,12 +2024,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const { data: { session } } = await sb.auth.getSession();
       currentSession = session;
-      if (session) { updateAuthBar(); await syncOnLogin(); }
-    } catch (e) {
-      console.error('Auth session lookup failed:', e);
-    }
+    } catch (e) { console.error('Auth session lookup failed:', e); }
   }
   updateAuthBar();
+  if (currentSession) {
+    await syncOnLogin();
+  }
 });
 </script>
 </body>
