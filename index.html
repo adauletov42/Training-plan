@@ -98,6 +98,7 @@
   .badge-rest     { background: var(--bg); color: var(--text-3); }
   .badge-recovery { background: var(--green-bg); color: var(--green-text); }
   .badge-volleyball { background: var(--amber-bg); color: var(--amber-text); }
+  .badge-home      { background: var(--teal-bg); color: var(--teal-text); }
   .badge-skip     { background: var(--red-bg); color: var(--red-text); }
   .badge-injury   { background: var(--amber-bg); color: var(--amber-text); }
   .day-done-badge { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: var(--r-md); white-space: nowrap; background: var(--green-bg); color: var(--green-text); display: inline-flex; align-items: center; gap: 4px; }
@@ -308,6 +309,7 @@
             <option value="BJJ">БЖЖ</option>
             <option value="Recovery">Восстановление</option>
             <option value="Volleyball">Волейбол</option>
+            <option value="Home">Дома</option>
           </select>
         </div>
         <div class="form-group" style="min-width:80px;max-width:100px;"><label>Вес (кг)</label><input type="number" id="logBodyWeight" step="0.1" placeholder="105"></div>
@@ -560,9 +562,10 @@ const TYPE_META = {
   'Восстановление':{ badge: 'recovery', dur: '30–40 мин', focus: 'МФР, ходьба, мобильность' },
   'Волейбол':      { badge: 'volleyball', dur: '90 мин',  focus: 'Игра + техника подачи и приёма' },
   'Отдых':         { badge: 'rest',     dur: '—',         focus: 'Сон 8+ ч, прогулка' },
+  'Дома':          { badge: 'home',     dur: '20–30 мин', focus: 'Полное тело, собственный вес' },
 };
 
-const WORKOUT_TYPES = ['Full Body A', 'Full Body Б', 'БЖЖ', 'Восстановление', 'Волейбол', 'Отдых'];
+const WORKOUT_TYPES = ['Full Body A', 'Full Body Б', 'БЖЖ', 'Восстановление', 'Волейбол', 'Дома', 'Отдых'];
 
 const WORKOUTS = {
   'Full Body A': {
@@ -639,6 +642,18 @@ const WORKOUTS = {
       { name: 'Игра 6х6', dur: '60 мин', zone: 'Зона 3–4 (125–160 уд/мин)' },
       { name: 'Заминка + стретчинг', dur: '15 мин', zone: 'Зона 1 (89–107 уд/мин)' },
     ]
+  },
+  'Дома': {
+    warmup: 'Суставная разминка 3–5 мин: круги плечами, бёдрами, коленями + 5 приседаний и 5 отжиманий с паузой',
+    exercises: [
+      { name: 'Отжимания',               sets:'3', reps:'max (10–20)', notes:'Руки шире плеч. При боли в плече — наклонные от стены или с кулаков', rest:'45 сек' },
+      { name: 'Приседания',              sets:'3', reps:'20–25',        notes:'Медленно вниз (3 сек), взрывно вверх. Прогресс: добавить паузу внизу', rest:'45 сек' },
+      { name: 'Выпады поочерёдно',       sets:'3', reps:'12/ногу',      notes:'Шаг вперёд, колено не выходит за носок. Вариант: реверсные выпады', rest:'45 сек' },
+      { name: 'Планка',                  sets:'3', reps:'45–60 сек',    notes:'Тело прямое, не задирать таз. Прогресс: боковая планка', rest:'30 сек' },
+      { name: 'Ягодичный мост',          sets:'3', reps:'15–20',        notes:'Лёжа, стопы у ягодиц. Прогресс: на одной ноге', rest:'30 сек' },
+      { name: 'Берпи (или прыжки)',       sets:'3', reps:'8–10',         notes:'Берпи без отжимания при боли в плече. Альтернатива — прыжки с разведением рук', rest:'60 сек' },
+    ],
+    finisher: 'Табата (по желанию): 20 сек работа / 10 сек отдых × 8 раундов\nУпражнение на выбор: приседания, скалолаз или прыжки на месте\nЦелевой пульс: зона 4 (142–160 уд/мин)',
   }
 };
 
@@ -1355,7 +1370,7 @@ function cycleNeedsWeights(cycle) { return cycle > 1 && !getCycleWeights(cycle);
 function cycleLifts() {
   const out = [];
   ['Full Body A', 'Full Body Б'].forEach(k => {
-    (WORKOUTS[k].exercises || []).forEach(ex => { if (ex.step) out.push(ex); });
+    (WORKOUTS[k].exercises || []).forEach(ex => { if (ex.step && ex.steps) out.push(ex); });
   });
   return out;
 }
@@ -1443,18 +1458,28 @@ function openWorkoutPanel(type, dayName) {
   if (!w) {
     html = '<p style="color:var(--text-2);">День полного отдыха. Сон 8+ часов, лёгкая прогулка.</p>';
   } else if (w.warmup) {
+    const stepped = !!(w.exercises && w.exercises[0] && w.exercises[0].steps);
     html += `<div style="background:var(--teal-bg);border-radius:var(--r-md);padding:.75rem 1rem;margin-bottom:1rem;">
       <div style="font-size:12px;font-weight:500;color:var(--teal-text);margin-bottom:3px;">Разминка (10 мин)</div>
       <div style="font-size:13px;color:var(--teal-text);">${w.warmup}</div></div>
     <div class="exercise-table-wrap"><table class="exercise-table"><thead><tr>
-      <th>Упражнение</th><th>Сейчас · ${STEP_LABELS[stepIndex(w.exercises[0], getWeek())]}</th><th>Ступени</th><th>Отдых</th>
+      <th>Упражнение</th><th>${stepped ? 'Сейчас · ' + STEP_LABELS[stepIndex(w.exercises[0], getWeek())] : 'Подходы × Повт.'}</th><th>${stepped ? 'Ступени' : 'Комментарий'}</th><th>Отдых</th>
     </tr></thead><tbody>`;
     const week = getWeek();
     const cyc = cycleOf(week);
     w.exercises.forEach(ex => {
+      // Упражнения без ступеней (например, «Дома») описаны парой sets/reps и
+      // текстовой подсказкой: у них нет прогрессии по неделям, и выдумывать её
+      // нельзя. Рендерим их так, как они заданы.
+      if (!ex.steps) {
+        html += `<tr><td><div class="exercise-name">${ex.name}</div></td>
+          <td style="white-space:nowrap;">${ex.sets} × ${ex.reps}</td>
+          <td><div class="exercise-note">${ex.notes || ''}</div></td><td style="white-space:nowrap;">${ex.rest}</td></tr>`;
+        return;
+      }
       const cur = exerciseLoad(ex, week);
       const saved = cyc > 1 ? getCycleWeights(cyc) : null;
-      const steps = (ex.steps || []).map((s, i) => {
+      const steps = ex.steps.map((s, i) => {
         let load = s.load;
         if (ex.step && saved && saved[ex.name]) {
           const kg = saved[ex.name][i];
@@ -1517,7 +1542,7 @@ function goToLog() {
   const t = document.getElementById('workoutPanel').currentType;
   closeWorkoutPanel();
   showTab('log');
-  const map = {'Full Body A':'Full Body A','Full Body Б':'Full Body B','БЖЖ':'BJJ','Восстановление':'Recovery','Волейбол':'Volleyball'};
+  const map = {'Full Body A':'Full Body A','Full Body Б':'Full Body B','БЖЖ':'BJJ','Восстановление':'Recovery','Волейбол':'Volleyball','Дома':'Home'};
   if (map[t]) document.getElementById('logType').value = map[t];
   updateSetsSection();
 }
@@ -1530,6 +1555,7 @@ function getSetsExercises(type) {
     ...WORKOUTS['Восстановление'].shoulderBlocks.map(b=>b.name),
     ...WORKOUTS['Восстановление'].kneeBlocks.map(b=>b.name),
   ];
+  if (type==='Home') return WORKOUTS['Дома'].exercises.map(e=>e.name);
   return [];
 }
 function updateSetsSection() {
@@ -1840,7 +1866,7 @@ function renderWorkoutAnalysis(logs, checkins) {
   }
 
   // ── By type ──
-  const typeMap = { 'Full Body A':'Full Body A','Full Body B':'Full Body Б','BJJ':'БЖЖ','Recovery':'Восстановление' };
+  const typeMap = { 'Full Body A':'Full Body A','Full Body B':'Full Body Б','BJJ':'БЖЖ','Recovery':'Восстановление','Home':'Дома' };
   const byType = {};
   logs.forEach(l => { const t = typeMap[l.type]||l.type; byType[t] = (byType[t]||0)+1; });
 
