@@ -11,8 +11,8 @@
 <meta name="theme-color" content="#534AB7">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="vendor/tabler-icons-subset.css">
+<script src="vendor/supabase.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -191,6 +191,32 @@
 
   .exercise-table-wrap { overflow-x: scroll; -webkit-overflow-scrolling: touch; display: block; width: 100%; }
   .exercise-table-wrap .exercise-table { min-width: 500px; width: max-content; }
+  ::selection { background: var(--accent-bg); color: var(--accent-text); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .metric-value, .exercise-table, .cycle-lift input { font-variant-numeric: tabular-nums; }
+
+  .cycle-lift { display: grid; grid-template-columns: 1fr repeat(3, 88px); gap: 10px; align-items: end; padding: 12px 0; border-bottom: 0.5px solid var(--border); }
+  .cycle-lift:last-of-type { border-bottom: none; }
+  .cycle-lift-name { font-size: 13px; font-weight: 500; }
+  .cycle-lift-prd { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .cycle-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .cycle-field span { font-size: 11px; color: var(--text-3); }
+  .cycle-lift input { width: 100%; min-width: 0; padding: 7px 8px; font-size: 15px; background: var(--bg); color: var(--text); border: 0.5px solid var(--border); border-radius: var(--r-md); -moz-appearance: textfield; appearance: textfield; }
+  .cycle-lift input::-webkit-outer-spin-button, .cycle-lift input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+  /* Пять вкладок не помещаются в один ряд на телефоне: суммарная ширина кнопок
+     384px не сжимается ниже min-content, из-за чего страница уезжала вбок на
+     81px при 320px. Делать nav прокручиваемым нельзя — пятая вкладка пропала бы
+     из основной навигации. Поэтому на узком экране это сетка 3+2. */
+  @media (max-width: 430px) {
+    nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    nav button { min-width: 0; min-height: 44px; padding: 8px 4px; font-size: 12px; gap: 4px; }
+    nav button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    nav button i { flex-shrink: 0; }
+    .cycle-lift { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cycle-lift-head { grid-column: 1 / -1; }
+  }
+
   @media (max-width: 600px) {
     .day-focus { display: none; }
   }
@@ -205,11 +231,11 @@
 </header>
 
 <nav>
-  <button class="active" onclick="showTab('dashboard')" id="tab-dashboard"><i class="ti ti-layout-dashboard" aria-hidden="true"></i> Сегодня</button>
-  <button onclick="showTab('schedule')" id="tab-schedule"><i class="ti ti-calendar-week" aria-hidden="true"></i> Расписание</button>
-  <button onclick="showTab('log')" id="tab-log"><i class="ti ti-notebook" aria-hidden="true"></i> Дневник</button>
-  <button onclick="showTab('progress')" id="tab-progress"><i class="ti ti-chart-line" aria-hidden="true"></i> Прогресс</button>
-  <button onclick="showTab('nutrition')" id="tab-nutrition"><i class="ti ti-apple" aria-hidden="true"></i> Питание</button>
+  <button class="active" onclick="showTab('dashboard')" id="tab-dashboard"><i class="ti ti-layout-dashboard" aria-hidden="true"></i> <span>Сегодня</span></button>
+  <button onclick="showTab('schedule')" id="tab-schedule"><i class="ti ti-calendar-week" aria-hidden="true"></i> <span>Расписание</span></button>
+  <button onclick="showTab('log')" id="tab-log"><i class="ti ti-notebook" aria-hidden="true"></i> <span>Дневник</span></button>
+  <button onclick="showTab('progress')" id="tab-progress"><i class="ti ti-chart-line" aria-hidden="true"></i> <span>Прогресс</span></button>
+  <button onclick="showTab('nutrition')" id="tab-nutrition"><i class="ti ti-apple" aria-hidden="true"></i> <span>Питание</span></button>
 </nav>
 
 <div class="auth-bar">
@@ -219,6 +245,7 @@
 
 <!-- DASHBOARD -->
 <div id="tab-dashboard-panel" class="tab active">
+  <div id="cycleBanner"></div>
   <div class="metrics" id="metricsGrid"></div>
   <div class="card" id="todayCard">
     <div class="card-title"><i class="ti ti-bolt" aria-hidden="true"></i> Сегодняшняя тренировка</div>
@@ -487,6 +514,22 @@
 </div>
 
 <!-- Workout Panel -->
+<div class="workout-panel" id="cyclePanel" onclick="closeCyclePanelBg(event)">
+  <div class="workout-panel-inner">
+    <div class="panel-handle"></div>
+    <div class="panel-title" id="cyclePanelTitle"></div>
+    <p style="font-size:13px;color:var(--text-2);margin-bottom:1rem;">
+      Задайте рабочий вес на недели 1–2. Следующие две ступени подставятся шагом по
+      правилу прогрессии из PRD §6.5 — поправьте любое значение, если знаете лучше.
+    </p>
+    <div id="cycleLifts"></div>
+    <div style="margin-top:1.25rem;">
+      <button class="btn btn-primary" onclick="saveCyclePanel()" style="margin-right:8px;"><i class="ti ti-check" aria-hidden="true"></i> Сохранить веса цикла</button>
+      <button class="btn" onclick="closeCyclePanel()">Отмена</button>
+    </div>
+  </div>
+</div>
+
 <div class="workout-panel" id="workoutPanel" onclick="closePanel(event)">
   <div class="workout-panel-inner">
     <div class="panel-handle"></div>
@@ -528,22 +571,38 @@ const WORKOUTS = {
   'Full Body A': {
     warmup: 'Гребной тренажёр или велосипед 8 мин (зона 2) + динамический стретчинг плеч и бёдер 2 мин',
     exercises: [
-      { name: 'Тяга верхнего блока широким хватом', sets:'3–4', reps:'8–12', notes:'Нед.1–2: 3×12 / 30–35 кг → Нед.7+: 4×8 / 55–70 кг', rest:'75 сек' },
-      { name: 'Приседание со штангой (Low Bar)',    sets:'3–4', reps:'6–12', notes:'Нед.1–2: 3×10 / гриф 20 кг → Нед.7+: 4×6–8 / 75–95 кг', rest:'90 сек' },
-      { name: 'Горизонтальная тяга в тренажёре (сидя)',  sets:'3–4', reps:'10–12', notes:'⚠️ Замена жима — щадит плечо. Нед.1–2: 3×12 / 30–40 кг → Нед.7+: 4×10 / 55–70 кг. Вернуть жим после восстановления плеча', rest:'60 сек' },
-      { name: 'Тяга гантели одной рукой',          sets:'3–4', reps:'8–12', notes:'Нед.1–2: 3×12 / 20–24 кг → Нед.7+: 4×8 / 34–42 кг', rest:'60 сек' },
-      { name: 'Планка классическая',               sets:'3',   reps:'20–60 сек', notes:'Нед.1–2: 20–25 сек → Нед.7+: 60 сек', rest:'45 сек' },
+      { name: 'Тяга верхнего блока широким хватом', rest:'75 сек', step:2.5, steps:[
+        { from:1, sets:'3×12', load:'30–35 кг' }, { from:3, sets:'4×10', load:'40–50 кг' }, { from:7, sets:'4×8', load:'55–70 кг' } ] },
+      { name: 'Приседание со штангой (Low Bar)', rest:'90 сек', step:5, steps:[
+        { from:1, sets:'3×10', load:'гриф 20 кг' }, { from:3, sets:'4×8', load:'55–70 кг' }, { from:7, sets:'4×6–8', load:'75–95 кг' } ] },
+      // Замена жима на время травмы плеча. В PRD такого упражнения нет, поэтому
+      // ступени ровно те, что были заданы при замене: промежуточная не выдумана.
+      { name: 'Горизонтальная тяга в тренажёре (сидя)', rest:'60 сек', step:2.5,
+        warn:'⚠️ Замена жима — щадит плечо. Вернуть жим после восстановления плеча', steps:[
+        { from:1, sets:'3×12', load:'30–40 кг' }, { from:7, sets:'4×10', load:'55–70 кг' } ] },
+      { name: 'Тяга гантели одной рукой', rest:'60 сек', step:2.5, steps:[
+        { from:1, sets:'3×12', load:'20–24 кг' }, { from:3, sets:'4×10', load:'26–32 кг' }, { from:7, sets:'4×8', load:'34–42 кг' } ] },
+      { name: 'Планка классическая', rest:'45 сек', step:0, steps:[
+        { from:1, sets:'3×', load:'20–25 сек' }, { from:3, sets:'3×', load:'40–50 сек' }, { from:7, sets:'3×', load:'60 сек' } ] },
     ],
     finisher: '⚠️ При боли в плече — заменить маховые гири на велотренажёр 5–8 мин интервалами (30 сек быстро / 30 сек медленно)\n\nСтандарт: Комплекс: махи гирей ×12 + бёрпи ×5\nНед.1–2: 3 раунда / гиря 16 кг / отдых 30 сек\nНед.3–6: 5 раундов / гиря 20 кг / отдых 30 сек\nНед.7+: 6–8 раундов / гиря 24 кг / отдых 20 сек\nЦелевой пульс: зона 4–5 (142–178 уд/мин)',
   },
   'Full Body Б': {
     warmup: 'Лёгкий бег или эллипс 8 мин (зона 2) + активация ягодиц, мобилизация голеностопа 2 мин',
     exercises: [
-      { name: 'Становая тяга (классика)',      sets:'3–4', reps:'5–8',       notes:'Нед.1–2: 3×8 / 20–40 кг → Нед.7+: 4×5 / 100–130 кг', rest:'120 сек' },
-      { name: 'Болгарский сплит-присед',       sets:'3–4', reps:'8–10/ногу', notes:'Нед.1–2: собств. вес → Нед.7+: штанга 40–60 кг', rest:'75 сек' },
-      { name: 'Тяга штанги в наклоне',        sets:'3–4', reps:'8–12',      notes:'Нед.1–2: 3×12 / 30–40 кг → Нед.7+: 4×8 / 65–80 кг', rest:'75 сек' },
-      { name: 'Face pull (тяга к лицу)',        sets:'3',   reps:'15–20',      notes:'⚠️ Замена OHP — восстановление ротаторной манжеты. Канатная рукоять на уровне лица / 10–20 кг. Вернуть OHP после восстановления плеча', rest:'45 сек' },
-      { name: 'Ягодичный мост на одной ноге', sets:'3',   reps:'12/ногу',   notes:'Во всех фазах', rest:'45 сек' },
+      { name: 'Становая тяга (классика)', rest:'120 сек', step:5, steps:[
+        { from:1, sets:'3×8', load:'20–40 кг' }, { from:3, sets:'4×6', load:'75–100 кг' }, { from:7, sets:'4×5', load:'100–130 кг' } ] },
+      { name: 'Болгарский сплит-присед', rest:'75 сек', step:2.5, steps:[
+        { from:1, sets:'3×10/ногу', load:'собств. вес' }, { from:3, sets:'3×10/ногу', load:'гантели 12–20 кг' }, { from:7, sets:'4×8/ногу', load:'штанга 40–60 кг' } ] },
+      { name: 'Тяга штанги в наклоне', rest:'75 сек', step:2.5, steps:[
+        { from:1, sets:'3×12', load:'30–40 кг' }, { from:3, sets:'4×10', load:'45–60 кг' }, { from:7, sets:'4×8', load:'65–80 кг' } ] },
+      // Реабилитация ротаторной манжеты: нагрузка по самочувствию, а не по
+      // правилу прогрессии, поэтому step:0 — в форму весов цикла не попадает.
+      { name: 'Face pull (тяга к лицу)', rest:'45 сек', step:0,
+        warn:'⚠️ Замена OHP — восстановление ротаторной манжеты. Вернуть OHP после восстановления плеча', steps:[
+        { from:1, sets:'3×15–20', load:'канатная рукоять на уровне лица / 10–20 кг' } ] },
+      { name: 'Ягодичный мост на одной ноге', rest:'45 сек', step:0, steps:[
+        { from:1, sets:'3×12/ногу', load:'собств. вес' } ] },
     ],
     finisher: 'Комплекс: фермерская ходьба 30 м + приседание-прыжок ×8\nНед.1–2: 3 раунда / гантели 20 кг / отдых 30 сек\nНед.3–6: 4 раунда / гантели 24 кг / отдых 30 сек\nНед.7+: 5 раундов / гантели 28–32 кг / отдых 20 сек\nЦелевой пульс: зона 4 (142–160 уд/мин)',
   },
@@ -601,7 +660,13 @@ const WORKOUTS = {
 // ── Supabase (cloud sync) ────────────────────────────────────────────────
 const SUPABASE_URL = 'https://ufnityjbeaccwgxtjikl.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_bPBjH4MJ_az3UGTtozPuFg_DY31scCA';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Клиент — необязательная зависимость: если supabase.js почему-то не
+// загрузился, приложение обязано продолжать работать локально, а не падать
+// на верхнем уровне скрипта и оставлять пустую страницу.
+const sb = (window.supabase && typeof window.supabase.createClient === 'function')
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+const SYNC_UNAVAILABLE_MSG = 'Синхронизация недоступна: не загрузилась библиотека Supabase. Данные сохраняются локально; проверьте соединение и обновите страницу.';
 
 let currentSession = null;
 
@@ -616,6 +681,14 @@ function closeAuthPanelBg(e) { if (e.target === document.getElementById('authPan
 function refreshAuthPanelView() {
   const formView = document.getElementById('authFormView');
   const loggedView = document.getElementById('authLoggedInView');
+  if (!sb) {
+    formView.style.display = 'none';
+    loggedView.style.display = 'none';
+    const err = document.getElementById('authError');
+    err.style.color = 'var(--text-2)';
+    err.textContent = SYNC_UNAVAILABLE_MSG;
+    return;
+  }
   if (currentSession) {
     formView.style.display = 'none';
     loggedView.style.display = 'flex';
@@ -629,6 +702,11 @@ function refreshAuthPanelView() {
 function updateAuthBar() {
   const text = document.getElementById('authStatusText');
   const btn = document.getElementById('authBarBtn');
+  if (!sb) {
+    text.innerHTML = '<i class="ti ti-cloud-off" aria-hidden="true"></i> Локально · синхронизация недоступна';
+    btn.textContent = 'Подробнее';
+    return;
+  }
   if (currentSession) {
     text.innerHTML = '<i class="ti ti-cloud-check" aria-hidden="true"></i> ' + currentSession.user.email;
     btn.textContent = 'Аккаунт';
@@ -643,6 +721,7 @@ async function doSignUp() {
   const password = document.getElementById('authPassword').value;
   const err = document.getElementById('authError');
   err.style.color = 'var(--red)';
+  if (!sb) { err.textContent = SYNC_UNAVAILABLE_MSG; return; }
   if (!email || password.length < 6) { err.textContent = 'Введите email и пароль (мин. 6 символов)'; return; }
   const { error } = await sb.auth.signUp({ email, password });
   if (error) { err.textContent = error.message; return; }
@@ -654,6 +733,7 @@ async function doSignIn() {
   const password = document.getElementById('authPassword').value;
   const err = document.getElementById('authError');
   err.style.color = 'var(--red)';
+  if (!sb) { err.textContent = SYNC_UNAVAILABLE_MSG; return; }
   if (!email || !password) { err.textContent = 'Введите email и пароль'; return; }
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) { err.textContent = error.message; return; }
@@ -662,11 +742,12 @@ async function doSignIn() {
   closeAuthPanel();
 }
 async function doSignOut() {
+  if (!sb) return closeAuthPanel();
   await sb.auth.signOut();
   closeAuthPanel();
 }
 
-sb.auth.onAuthStateChange((event, session) => {
+if (sb) sb.auth.onAuthStateChange((event, session) => {
   currentSession = session;
   updateAuthBar();
   refreshAuthPanelView();
@@ -675,7 +756,9 @@ sb.auth.onAuthStateChange((event, session) => {
   }
 });
 
+
 async function syncOnLogin() {
+  if (!sb) return { logsCount: 0, errors: [SYNC_UNAVAILABLE_MSG] };
   const pushErrors = await pushAllLocalData();
   const { logsCount, errors: pullErrors } = await pullAllData();
   renderEverything();
@@ -685,6 +768,7 @@ async function syncOnLogin() {
 async function manualSync() {
   const btn = document.querySelector('#authLoggedInView .btn:not(.btn-danger)');
   const statusEl = document.getElementById('syncStatusMsg');
+  if (!sb) { if (statusEl) statusEl.textContent = SYNC_UNAVAILABLE_MSG; return; }
   if (btn) btn.disabled = true;
   if (statusEl) statusEl.textContent = 'Синхронизация...';
   try {
@@ -710,6 +794,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 async function pushAllLocalData() {
+  if (!sb) return [SYNC_UNAVAILABLE_MSG];
   const errors = [];
   if (!currentSession) return errors;
   try {
@@ -749,12 +834,19 @@ async function pushAllLocalData() {
         if (error) { console.error('Sync upload (strength) failed:', error); errors.push('загрузка силовых: ' + error.message); }
       }
     }
-    for (let w = 1; w <= getMaxWeek(); w++) {
-      const raw = localStorage.getItem('sched_w' + w);
-      if (raw) {
-        const { error } = await sb.from('schedule_overrides').upsert({ user_id: currentSession.user.id, week: w, data: JSON.parse(raw) });
-        if (error) { console.error('Sync upload (schedule) failed:', error); errors.push('загрузка расписания: ' + error.message); }
-      }
+    const cw = getAllCycleWeights();
+    for (const cycle of Object.keys(cw)) {
+      const { error } = await sb.from('cycle_weights').upsert({ user_id: currentSession.user.id, cycle: Number(cycle), data: cw[cycle] });
+      if (error) { console.error('Sync upload (cycle weights) failed:', error); errors.push('загрузка весов цикла: ' + error.message); }
+    }
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      const m = key && key.match(/^sched_w(\d+)$/);
+      if (!m) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const { error } = await sb.from('schedule_overrides').upsert({ user_id: currentSession.user.id, week: Number(m[1]), data: JSON.parse(raw) });
+      if (error) { console.error('Sync upload (schedule) failed:', error); errors.push('загрузка расписания: ' + error.message); }
     }
   } catch (e) {
     console.error('Sync upload failed:', e);
@@ -764,16 +856,18 @@ async function pushAllLocalData() {
 }
 
 async function pullAllData() {
-  const [{ data: logs, error: e1 }, { data: checkins, error: e2 }, { data: cooper, error: e3 }, { data: strength, error: e4 }, { data: sched, error: e5 }] = await Promise.all([
+  if (!sb) return { logsCount: 0, errors: [SYNC_UNAVAILABLE_MSG] };
+  const [{ data: logs, error: e1 }, { data: checkins, error: e2 }, { data: cooper, error: e3 }, { data: strength, error: e4 }, { data: sched, error: e5 }, { data: cweights, error: e6 }] = await Promise.all([
     sb.from('workout_logs').select('*').order('date', { ascending: false }),
     sb.from('checkins').select('*'),
     sb.from('cooper_tests').select('*'),
     sb.from('strength_records').select('*').order('date', { ascending: false }),
     sb.from('schedule_overrides').select('*'),
+    sb.from('cycle_weights').select('*'),
   ]);
-  const labels = ['тренировки', 'чек-ины', 'тесты Купера', 'силовые', 'расписание'];
+  const labels = ['тренировки', 'чек-ины', 'тесты Купера', 'силовые', 'расписание', 'веса циклов'];
   const errors = [];
-  [e1,e2,e3,e4,e5].forEach((e, i) => { if (e) { console.error('Sync download failed:', e); errors.push('скачивание (' + labels[i] + '): ' + e.message); } });
+  [e1,e2,e3,e4,e5,e6].forEach((e, i) => { if (e) { console.error('Sync download failed:', e); errors.push('скачивание (' + labels[i] + '): ' + e.message); } });
   if (logs) {
     localStorage.setItem('trainLogs', JSON.stringify(logs.map(l => ({
       id: Number(l.id), date: l.date, type: l.type, bodyWeight: l.body_weight,
@@ -795,6 +889,10 @@ async function pullAllData() {
   }
   if (sched) {
     sched.forEach(s => localStorage.setItem('sched_w' + s.week, JSON.stringify(s.data)));
+  }
+  if (cweights) {
+    const obj = {}; cweights.forEach(c => obj[c.cycle] = c.data);
+    localStorage.setItem('cycleWeights', JSON.stringify(obj));
   }
   return { logsCount: logs ? logs.length : 0, errors };
 }
@@ -842,6 +940,10 @@ async function pushStrength(entry) {
 async function pushSchedule(week, sched) {
   if (!currentSession) return;
   await sb.from('schedule_overrides').upsert({ user_id: currentSession.user.id, week, data: sched });
+}
+async function pushCycleWeights(cycle, data) {
+  if (!currentSession || !sb) return;
+  await sb.from('cycle_weights').upsert({ user_id: currentSession.user.id, cycle, data });
 }
 async function pushDeleteSchedule(week) {
   if (!currentSession) return;
@@ -1167,7 +1269,26 @@ function changeWeek(dir) {
 function renderDashboard() {
   const week = getWeek();
   displayWeek = week;
+  const cycle = cycleOf(week);
   document.getElementById('currentWeekBadge').textContent = 'Неделя ' + week;
+
+  const banner = document.getElementById('cycleBanner');
+  if (banner) {
+    if (cycleNeedsWeights(cycle)) {
+      banner.innerHTML = `<div class="card">
+        <div class="card-title"><i class="ti ti-barbell" aria-hidden="true"></i> Цикл ${cycle}: веса не заданы</div>
+        <div style="font-size:14px;margin-bottom:12px;">Фазы пошли по ${cycle}-му кругу, а программа показывает веса первого цикла. Задайте свои рабочие веса.</div>
+        <button class="btn btn-primary" onclick="openCyclePanel(${cycle})"><i class="ti ti-pencil" aria-hidden="true"></i> Задать веса цикла ${cycle}</button>
+      </div>`;
+    } else if (cycle > 1) {
+      banner.innerHTML = `<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:180px;font-size:14px;">Веса цикла ${cycle} заданы.</div>
+        <button class="btn" onclick="openCyclePanel(${cycle})" style="font-size:13px;"><i class="ti ti-pencil" aria-hidden="true"></i> Изменить</button>
+      </div>`;
+    } else {
+      banner.innerHTML = '';
+    }
+  }
   const lastLog = getLastLog();
   const lastWeight = lastLog ? lastLog.bodyWeight : null;
   const metrics = [
@@ -1219,19 +1340,114 @@ function renderDashboard() {
 }
 
 // ── Workout panel ──────────────────────────────────────────────────────────
-function getPhaseWeight(notes, week) {
-  if (!notes || notes === 'Во всех фазах') return '';
-  const cycleWeek = ((week - 1) % 20) + 1;
-  const phases = notes.split(' → ');
-  let chosen = phases[0];
-  for (const p of phases) {
-    const m = p.match(/Нед\.(\d+)/);
-    if (m && parseInt(m[1]) <= cycleWeek) chosen = p;
-  }
-  const body = chosen.replace(/^Нед\.[^:]+:\s*/, '');
-  const slash = body.indexOf(' / ');
-  return slash >= 0 ? body.slice(slash + 3) : body;
+// Две разные шкалы, которые легко перепутать: фазы идут неделями 1–6 / 7–14 /
+// 15–20 цикла (PRD §5), а ступени весов — неделями 1–2 / 3–6 / 7+ (столбцы
+// таблиц PRD §6.1 и §6.2). Границы не совпадают.
+const CYCLE_LEN = 20;
+const STEP_LABELS = ['нед. 1–2', 'нед. 3–6', 'нед. 7+'];
+function cycleOf(absWeek) { return Math.floor((absWeek - 1) / CYCLE_LEN) + 1; }
+function weekInCycle(absWeek) { return ((absWeek - 1) % CYCLE_LEN) + 1; }
+
+function stepIndex(ex, absWeek) {
+  const w = weekInCycle(absWeek);
+  let idx = 0;
+  (ex.steps || []).forEach((s, i) => { if (s.from <= w) idx = i; });
+  return idx;
 }
+
+function getAllCycleWeights() {
+  try { return JSON.parse(localStorage.getItem('cycleWeights') || '{}'); } catch { return {}; }
+}
+function getCycleWeights(cycle) { return getAllCycleWeights()[cycle] || null; }
+function saveCycleWeights(cycle, obj) {
+  const all = getAllCycleWeights();
+  all[cycle] = obj;
+  localStorage.setItem('cycleWeights', JSON.stringify(all));
+  pushCycleWeights(cycle, obj);
+}
+function cycleNeedsWeights(cycle) { return cycle > 1 && !getCycleWeights(cycle); }
+
+function cycleLifts() {
+  const out = [];
+  ['Full Body A', 'Full Body Б'].forEach(k => {
+    (WORKOUTS[k].exercises || []).forEach(ex => { if (ex.step && ex.steps) out.push(ex); });
+  });
+  return out;
+}
+
+function fmtKg(n) {
+  const v = Number(n);
+  return Number.isInteger(v) ? String(v) : v.toFixed(1).replace(/\.0$/, '');
+}
+
+// Подсказка по правилу прогрессии PRD §6.5, а не расчёт нагрузки.
+function suggestSteps(baseKg, step) {
+  const b = Number(baseKg);
+  if (!isFinite(b) || b <= 0) return ['', '', ''];
+  return [b, b + step * 2, b + step * 4].map(fmtKg);
+}
+
+// Нагрузка упражнения на абсолютной неделе. С цикла 2 веса задаёт атлет:
+// приложение не выводит их из дневника и не домножает таблицу PRD.
+function exerciseLoad(ex, absWeek) {
+  const i = stepIndex(ex, absWeek);
+  const base = (ex.steps || [])[i] || { sets: '', load: '' };
+  const cycle = cycleOf(absWeek);
+  if (cycle === 1 || !ex.step) return { sets: base.sets, load: base.load, pending: false };
+  const saved = getCycleWeights(cycle);
+  const kg = saved && saved[ex.name] ? saved[ex.name][i] : null;
+  if (kg === null || kg === undefined || kg === '') return { sets: base.sets, load: base.load, pending: true };
+  return { sets: base.sets, load: fmtKg(kg) + ' кг', pending: false };
+}
+
+function openCyclePanel(cycle) {
+  const saved = getCycleWeights(cycle) || {};
+  document.getElementById('cyclePanelTitle').textContent = 'Рабочие веса · цикл ' + cycle;
+  const panel = document.getElementById('cyclePanel');
+  panel.dataset.cycle = String(cycle);
+  document.getElementById('cycleLifts').innerHTML = cycleLifts().map((ex, i) => {
+    const vals = saved[ex.name] || ['', '', ''];
+    const prd = ex.steps.map(s => s.load).join(' · ');
+    const field = (k, extra) => `<label class="cycle-field" for="cw-${i}-${k}">
+      <span>Нед. ${['1–2','3–6','7+'][k]}</span>
+      <input type="number" step="0.5" inputmode="decimal" id="cw-${i}-${k}" value="${vals[k] ?? ''}"${extra}>
+    </label>`;
+    return `<div class="cycle-lift">
+      <div class="cycle-lift-head">
+        <div class="cycle-lift-name">${ex.name}</div>
+        <div class="cycle-lift-prd">цикл 1: ${prd} · шаг ${fmtKg(ex.step)} кг</div>
+      </div>
+      ${field(0, ` oninput="prefillCycleRow(${i}, ${ex.step})"`)}${field(1, '')}${field(2, '')}
+    </div>`;
+  }).join('');
+  panel.classList.add('open');
+}
+// Ступени 2–3 заполняются, только пока атлет их не трогал: правка не затирается.
+function prefillCycleRow(i, step) {
+  const s = suggestSteps(document.getElementById('cw-' + i + '-0').value, step);
+  [1, 2].forEach(k => {
+    const el = document.getElementById('cw-' + i + '-' + k);
+    if (!el.dataset.touched) el.value = s[k];
+    el.onchange = () => { el.dataset.touched = '1'; };
+  });
+}
+function saveCyclePanel() {
+  const cycle = Number(document.getElementById('cyclePanel').dataset.cycle);
+  const obj = {};
+  cycleLifts().forEach((ex, i) => {
+    const vals = [0, 1, 2].map(k => document.getElementById('cw-' + i + '-' + k).value.trim());
+    if (vals.some(v => v !== '')) obj[ex.name] = vals;
+  });
+  if (!Object.keys(obj).length) {
+    alert('Не заполнено ни одного веса. Введите хотя бы недели 1–2 одного упражнения.');
+    return;
+  }
+  saveCycleWeights(cycle, obj);
+  closeCyclePanel();
+  renderDashboard();
+}
+function closeCyclePanel() { document.getElementById('cyclePanel').classList.remove('open'); }
+function closeCyclePanelBg(e) { if (e.target === document.getElementById('cyclePanel')) closeCyclePanel(); }
 
 function openWorkoutPanel(type, dayName) {
   const panel = document.getElementById('workoutPanel');
@@ -1242,18 +1458,38 @@ function openWorkoutPanel(type, dayName) {
   if (!w) {
     html = '<p style="color:var(--text-2);">День полного отдыха. Сон 8+ часов, лёгкая прогулка.</p>';
   } else if (w.warmup) {
+    const stepped = !!(w.exercises && w.exercises[0] && w.exercises[0].steps);
     html += `<div style="background:var(--teal-bg);border-radius:var(--r-md);padding:.75rem 1rem;margin-bottom:1rem;">
       <div style="font-size:12px;font-weight:500;color:var(--teal-text);margin-bottom:3px;">Разминка (10 мин)</div>
       <div style="font-size:13px;color:var(--teal-text);">${w.warmup}</div></div>
     <div class="exercise-table-wrap"><table class="exercise-table"><thead><tr>
-      <th>Упражнение</th><th>Подходы × Повт.</th><th>Нагрузка по неделям</th><th>Отдых</th>
+      <th>Упражнение</th><th>${stepped ? 'Сейчас · ' + STEP_LABELS[stepIndex(w.exercises[0], getWeek())] : 'Подходы × Повт.'}</th><th>${stepped ? 'Ступени' : 'Комментарий'}</th><th>Отдых</th>
     </tr></thead><tbody>`;
     const week = getWeek();
+    const cyc = cycleOf(week);
     w.exercises.forEach(ex => {
-      const wt = getPhaseWeight(ex.notes, week);
-      html += `<tr><td><div class="exercise-name">${ex.name}</div></td>
-        <td style="white-space:nowrap;">${ex.sets} × ${ex.reps}${wt ? '<div class="exercise-note" style="margin-top:2px;">'+wt+'</div>' : ''}</td>
-        <td><div class="exercise-note">${ex.notes}</div></td><td style="white-space:nowrap;">${ex.rest}</td></tr>`;
+      // Упражнения без ступеней (например, «Дома») описаны парой sets/reps и
+      // текстовой подсказкой: у них нет прогрессии по неделям, и выдумывать её
+      // нельзя. Рендерим их так, как они заданы.
+      if (!ex.steps) {
+        html += `<tr><td><div class="exercise-name">${ex.name}</div></td>
+          <td style="white-space:nowrap;">${ex.sets} × ${ex.reps}</td>
+          <td><div class="exercise-note">${ex.notes || ''}</div></td><td style="white-space:nowrap;">${ex.rest}</td></tr>`;
+        return;
+      }
+      const cur = exerciseLoad(ex, week);
+      const saved = cyc > 1 ? getCycleWeights(cyc) : null;
+      const steps = ex.steps.map((s, i) => {
+        let load = s.load;
+        if (ex.step && saved && saved[ex.name]) {
+          const kg = saved[ex.name][i];
+          if (kg !== null && kg !== undefined && kg !== '') load = fmtKg(kg) + ' кг';
+        }
+        return `${s.sets} ${load}`;
+      }).join(' · ');
+      html += `<tr><td><div class="exercise-name">${ex.name}</div>${ex.warn ? '<div class="exercise-note" style="margin-top:2px;">'+ex.warn+'</div>' : ''}</td>
+        <td style="white-space:nowrap;"><strong>${cur.sets} ${cur.load}</strong>${cur.pending ? '<div class="exercise-note" style="margin-top:2px;">веса цикла '+cyc+' не заданы</div>' : ''}</td>
+        <td><div class="exercise-note">${steps}</div></td><td style="white-space:nowrap;">${ex.rest}</td></tr>`;
     });
     html += `</tbody></table></div>
     <div class="finisher-box">
@@ -1810,10 +2046,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderCheckinHistory();
   renderDashboard();
 
-  const { data: { session } } = await sb.auth.getSession();
-  currentSession = session;
+  if (sb) {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      currentSession = session;
+    } catch (e) { console.error('Auth session lookup failed:', e); }
+  }
   updateAuthBar();
-  if (session) {
+  if (currentSession) {
     await syncOnLogin();
   }
 });

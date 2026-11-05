@@ -1,4 +1,8 @@
--- Выполнить один раз в Supabase: Project -> SQL Editor -> New query -> вставить и Run
+-- Выполнить в Supabase: Project -> SQL Editor -> New query -> вставить и Run.
+-- Файл безопасен для повторного прогона: у CREATE POLICY в PostgreSQL нет
+-- IF NOT EXISTS, поэтому каждая политика сначала снимается DROP POLICY IF EXISTS.
+-- Без этого повторная вставка падала на первой же политике и не доходила до
+-- таблиц, добавленных ниже.
 
 create table if not exists public.workout_logs (
   id bigint primary key,
@@ -14,6 +18,7 @@ create table if not exists public.workout_logs (
   created_at timestamptz default now()
 );
 alter table public.workout_logs enable row level security;
+drop policy if exists "workout_logs_own" on public.workout_logs;
 create policy "workout_logs_own" on public.workout_logs
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
@@ -27,6 +32,7 @@ create table if not exists public.checkins (
   primary key (user_id, date)
 );
 alter table public.checkins enable row level security;
+drop policy if exists "checkins_own" on public.checkins;
 create policy "checkins_own" on public.checkins
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
@@ -37,6 +43,7 @@ create table if not exists public.cooper_tests (
   primary key (user_id, week)
 );
 alter table public.cooper_tests enable row level security;
+drop policy if exists "cooper_tests_own" on public.cooper_tests;
 create policy "cooper_tests_own" on public.cooper_tests
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
@@ -48,6 +55,7 @@ create table if not exists public.strength_records (
   kg numeric not null
 );
 alter table public.strength_records enable row level security;
+drop policy if exists "strength_records_own" on public.strength_records;
 create policy "strength_records_own" on public.strength_records
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
@@ -58,5 +66,17 @@ create table if not exists public.schedule_overrides (
   primary key (user_id, week)
 );
 alter table public.schedule_overrides enable row level security;
+drop policy if exists "schedule_overrides_own" on public.schedule_overrides;
 create policy "schedule_overrides_own" on public.schedule_overrides
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create table if not exists public.cycle_weights (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  cycle int not null,
+  data jsonb not null,
+  primary key (user_id, cycle)
+);
+alter table public.cycle_weights enable row level security;
+drop policy if exists "cycle_weights_own" on public.cycle_weights;
+create policy "cycle_weights_own" on public.cycle_weights
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
